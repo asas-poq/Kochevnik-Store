@@ -1,0 +1,89 @@
+# ==============================================================================
+# Docker Compose конфигурация для проекта Ulaanbaatar Cashmere Backend
+# Включает: PostgreSQL 16, Redis 7, MinIO (локальный S3) и FastAPI Backend
+# ==============================================================================
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. База данных PostgreSQL 16
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ubcashmere_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ubcashmere}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ubcashmere_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-ubcashmere_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ubcashmere} -d ${POSTGRES_DB:-ubcashmere_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. Брокер и кэш Redis 7 (для кэширования каталога и фоновых задач)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ubcashmere_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 3. Локальное S3-хранилище MinIO (для загрузки фото через админку)
+  # ----------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: ubcashmere_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"   # S3 API порт
+      - "9001:9001"   # Веб-консоль MinIO
+    volumes:
+      - minio_data:/data
+
+  # ----------------------------------------------------------------------------
+  # 4. Приложение FastAPI Backend
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ubcashmere_backend
+    restart: unless-stopped
+    env_file:
+      - .env.example
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    command: >
+      sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
