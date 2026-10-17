@@ -1,0 +1,11 @@
+# JetBrains IDE
+.idea/
+
+*.iml
+.vscode/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.db
