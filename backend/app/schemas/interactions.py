@@ -3,8 +3,8 @@ Pydantic v2 схемы для лайков (избранного) и комме�
 """
 
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Dict, List, Optional
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LikeToggleOut(BaseModel):
@@ -59,7 +59,7 @@ class ReviewOut(BaseModel):
     product_id: int
     user_id: int
     parent_id: Optional[int] = None
-    rating: int
+    rating: Optional[int] = None  # у ответов (parent_id != None) оценки нет
     comment_text: str
     advantages: Optional[str] = None
     disadvantages: Optional[str] = None
@@ -70,3 +70,36 @@ class ReviewOut(BaseModel):
     replies: List["ReviewOut"] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewUpdateIn(BaseModel):
+    """Частичное редактирование своего отзыва (передавать только изменяемые поля)."""
+
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    comment_text: Optional[str] = Field(None, min_length=3, max_length=3000)
+    advantages: Optional[str] = Field(None, max_length=500)
+    disadvantages: Optional[str] = Field(None, max_length=500)
+
+    @model_validator(mode="after")
+    def at_least_one_field(self):
+        if not self.model_fields_set:
+            raise ValueError("Передайте хотя бы одно поле для изменения.")
+        return self
+
+
+class MyReviewOut(ReviewOut):
+    """Отзыв в личном кабинете: + краткая информация о товаре и статус модерации."""
+
+    is_approved: bool
+    product_slug: str
+    product_name: str
+    product_image_url: Optional[str] = None
+
+
+class ReviewSummaryOut(BaseModel):
+    """Сводка рейтинга товара: средняя оценка и распределение по звёздам."""
+
+    product_id: int
+    total_reviews: int
+    average_rating: float
+    distribution: Dict[int, int] = Field(..., description="{5: 12, 4: 3, 3: 0, 2: 1, 1: 0}")

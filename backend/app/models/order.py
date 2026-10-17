@@ -5,6 +5,7 @@
 """
 
 from datetime import datetime, timezone
+from enum import Enum
 from typing import List, Optional
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,6 +15,16 @@ from app.db.base import Base
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class OrderStatus(str, Enum):
+    """Статусы заказа (значения хранятся в `orders.status` как строки)."""
+
+    PENDING = "pending"
+    PAID = "paid"
+    SHIPPED = "shipped"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class Order(Base):

@@ -3,9 +3,17 @@ Pydantic v2 схемы для каталога товаров, категори�
 Обеспечивают строгую валидацию входных и выходных данных API и красивую документацию в Swagger UI.
 """
 
+import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Dict, List, Literal, Optional
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 
 # ==============================================================================
@@ -110,7 +118,7 @@ class SiblingColorVariantOut(BaseModel):
 # ==============================================================================
 class ProductCardOut(BaseModel):
     """
-    Облегченная карточка товара для сетки каталога (`GET /api/v1/products`).
+    Облегченная карточка товара для сеток каталога и рекомендаций.
     Отдает ровно те данные, которые нужны для рендера превью-карточки в каталоге.
     """
     id: int
@@ -134,6 +142,18 @@ class ProductCardOut(BaseModel):
     images: List[ProductImageOut] = Field(default_factory=list)
     sizes: List[ProductSizeOut] = Field(default_factory=list)
     materials: List[ProductMaterialOut] = Field(default_factory=list)
+
+    @computed_field(description="Есть ли хотя бы один размер в наличии")  # type: ignore[prop-decorator]
+    @property
+    def in_stock(self) -> bool:
+        return any(size.stock > 0 for size in self.sizes)
+
+    @computed_field(description="Скидка в процентах (0, если скидки нет)")  # type: ignore[prop-decorator]
+    @property
+    def discount_percent(self) -> int:
+        if self.old_price and self.old_price > self.current_price:
+            return round((self.old_price - self.current_price) * 100 / self.old_price)
+        return 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -164,46 +184,228 @@ class ProductDetailOut(ProductCardOut):
     model_config = ConfigDict(from_attributes=True)
 
 
+class FacetColorOut(BaseModel):
+    """Цвет в панели фильтров: название, HEX для кружочка и сколько товаров под текущую выборку."""
+    name: str
+    hex: str = "#D8CFC4"
+    count: int
+
+
+class FacetOptionOut(BaseModel):
+    """Значение фильтра (материал, размер) и количество подходящих товаров."""
+    name: str
+    count: int
+
+
+class PriceRangeOut(BaseModel):
+    min: int = 0
+    max: int = 0
+
+
+class CatalogFacetsOut(BaseModel):
+    """
+    Доступные значения фильтров ПОД ТЕКУЩУЮ ВЫБОРКУ.
+    Счётчики каждой группы считаются с учётом всех остальных активных фильтров,
+    но без фильтра самой группы — так фронтенд может показывать «Серый (4)»
+    и не прячет выбранные значения.
+    """
+    colors: List[FacetColorOut] = Field(default_factory=list)
+    materials: List[FacetOptionOut] = Field(default_factory=list)
+    sizes: List[FacetOptionOut] = Field(default_factory=list)
+    price_range: PriceRangeOut = Field(default_factory=PriceRangeOut)
+
+
 class PaginatedProductsOut(BaseModel):
-    """Ответ каталога с пагинацией и метаданными доступных фильтров."""
+    """Ответ каталога (`GET /api/v1/products/catalog`) с пагинацией и фасетами фильтров."""
     total: int = Field(..., description="Общее количество найденных товаров под фильтр")
     page: int = Field(..., description="Текущая страница")
     per_page: int = Field(..., description="Количество товаров на странице")
     total_pages: int = Field(..., description="Всего страниц")
     items: List[ProductCardOut] = Field(..., description="Список карточек товаров")
-    available_filters: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Доступные значения фильтров (цвета, материалы, диапазон цен, размеры)",
+    available_filters: CatalogFacetsOut = Field(
+        default_factory=CatalogFacetsOut,
+        description="Доступные значения фильтров с количеством товаров",
     )
 
 
-class ProductCreateUpdateIn(BaseModel):
-    """Схема для создания или обновления товара администратором через API."""
-    slug: str
-    name: str
-    article: Optional[str] = None
-    brand: str = "Ulaanbaatar"
+class RecommendationsOut(BaseModel):
+    """
+    Витрина рекомендаций (`GET /api/v1/products`).
+    Секции независимы: один товар может попасть в несколько (например, популярный и сезонный).
+    В рекомендации попадают только товары, которые есть в наличии.
+    """
+    season: Literal["winter", "spring", "summer", "autumn"]
+    season_label: str = Field(..., description="Название сезона на русском: «Осень»")
+    popular: List[ProductCardOut] = Field(default_factory=list, description="Хиты: продажи, лайки, отзывы, рейтинг")
+    seasonal: List[ProductCardOut] = Field(default_factory=list, description="Подборка под текущий сезон")
+    new_arrivals: List[ProductCardOut] = Field(default_factory=list, description="Новинки")
+    on_sale: List[ProductCardOut] = Field(default_factory=list, description="Товары со скидкой")
+
+
+# ==============================================================================
+# Создание / обновление товара администратором
+# ==============================================================================
+_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _check_slug(value: str) -> str:
+    value = value.strip().lower()
+    if not _SLUG_RE.match(value):
+        raise ValueError("Slug: только латиница, цифры и дефисы, например `sviter-kashemir-molochnyi`.")
+    return value
+
+
+def _check_hex(value: Optional[str]) -> Optional[str]:
+    if value is not None and not _HEX_RE.match(value):
+        raise ValueError("HEX-цвет должен быть в формате #RRGGBB, например #D8CFC4.")
+    return value
+
+
+def _normalize_sizes(value: Dict[str, int]) -> Dict[str, int]:
+    result: Dict[str, int] = {}
+    for raw_name, qty in value.items():
+        name = raw_name.strip().upper()
+        if not name:
+            raise ValueError("Название размера не может быть пустым.")
+        if name in result:
+            raise ValueError(f"Размер «{name}» указан дважды.")
+        if qty < 0:
+            raise ValueError(f"Остаток для размера «{name}» не может быть отрицательным.")
+        result[name] = qty
+    return result
+
+
+def _check_materials(value: List[ProductMaterialOut]) -> List[ProductMaterialOut]:
+    for item in value:
+        if not 0 < item.percent <= 100:
+            raise ValueError(f"Процент материала «{item.material}» должен быть от 0 до 100.")
+    return value
+
+
+def _check_prices(current: Optional[int], old: Optional[int]) -> None:
+    if current is not None and old is not None and old <= current:
+        raise ValueError("Старая цена должна быть больше текущей (иначе это не скидка). Оставьте old_price пустым.")
+
+
+class ProductCreateIn(BaseModel):
+    """
+    Создание товара. ОДИН ЦВЕТ = ОДНА КАРТОЧКА: если у модели два цвета, создаются две карточки
+    с одинаковым `color_group` (у каждой свои фото, остатки и slug).
+    """
+    slug: str = Field(..., max_length=255)
+    name: str = Field(..., min_length=2, max_length=300)
+    article: Optional[str] = Field(None, max_length=64)
+    brand: str = Field("Ulaanbaatar", max_length=120)
     category_id: Optional[int] = None
-    color: Optional[str] = None
-    color_hex: Optional[str] = "#D8CFC4"
-    color_group: Optional[str] = None
-    composition: Optional[str] = "100% кашемир"
-    density_yarn: Optional[str] = "2-ply (26/2 Nm)"
-    care_text: Optional[str] = (
-        "Ручная стирка при температуре до 30°C специальными средствами для кашемира. "
-        "Сушить в расправленном виде на горизонтальной поверхности."
+    color: Optional[str] = Field(None, max_length=80)
+    color_hex: Optional[str] = Field(None, description="Если не указан — подставится из справочника по названию цвета")
+    color_group: Optional[str] = Field(
+        None,
+        description="Общий ключ модели для всех её цветов. Если пусто — равен slug этой карточки",
     )
+    composition: Optional[str] = Field(None, max_length=255)
+    density_yarn: Optional[str] = Field(None, max_length=120)
+    care_text: Optional[str] = None
     measurements: Optional[str] = None
     description: Optional[str] = None
     current_price: int = Field(..., gt=0)
-    old_price: Optional[int] = None
-    image_urls: List[str] = Field(default_factory=list)
+    old_price: Optional[int] = Field(None, gt=0)
+    image_urls: List[str] = Field(default_factory=list, max_length=20)
     sizes_stock: Dict[str, int] = Field(
-        default_factory=lambda: {"S": 3, "M": 5, "L": 4},
-        description="Словарь размеров и остатков на складе, например {'S': 3, 'M': 5, 'L': 2}",
+        ...,
+        description="Размеры и остатки, например {'S': 3, 'M': 5}. Нужен минимум один размер: без него товар нельзя купить",
     )
     materials: List[ProductMaterialOut] = Field(default_factory=list)
-    sibling_slugs: List[str] = Field(default_factory=list)
+    sibling_slugs: List[str] = Field(
+        default_factory=list,
+        description="Slug других цветов этой модели (необязательно, если задан общий color_group)",
+    )
+    attributes: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Доп. характеристики, например {'Сезон': 'осень-зима', 'Посадка': 'свободная'}",
+    )
+
+    @field_validator("slug")
+    @classmethod
+    def _v_slug(cls, v: str) -> str:
+        return _check_slug(v)
+
+    @field_validator("color_hex")
+    @classmethod
+    def _v_hex(cls, v: Optional[str]) -> Optional[str]:
+        return _check_hex(v)
+
+    @field_validator("sizes_stock")
+    @classmethod
+    def _v_sizes(cls, v: Dict[str, int]) -> Dict[str, int]:
+        if not v:
+            raise ValueError("Укажите хотя бы один размер (для сумок — «ONE SIZE»).")
+        return _normalize_sizes(v)
+
+    @field_validator("materials")
+    @classmethod
+    def _v_materials(cls, v: List[ProductMaterialOut]) -> List[ProductMaterialOut]:
+        return _check_materials(v)
+
+    @model_validator(mode="after")
+    def _v_prices(self):
+        _check_prices(self.current_price, self.old_price)
+        return self
+
+
+# Обратная совместимость со старым именем схемы
+ProductCreateUpdateIn = ProductCreateIn
+
+
+class ProductUpdateIn(BaseModel):
+    """
+    Частичное обновление товара (PATCH): меняются только переданные поля.
+    `slug` менять нельзя — это адрес страницы.
+    `sizes_stock` — слияние (указанные размеры обновляются/добавляются, остальные не трогаются),
+    `materials`, `sibling_slugs`, `attributes` — полная замена списка.
+    """
+    name: Optional[str] = Field(None, min_length=2, max_length=300)
+    article: Optional[str] = Field(None, max_length=64)
+    brand: Optional[str] = Field(None, max_length=120)
+    category_id: Optional[int] = None
+    color: Optional[str] = Field(None, max_length=80)
+    color_hex: Optional[str] = None
+    color_group: Optional[str] = None
+    composition: Optional[str] = Field(None, max_length=255)
+    density_yarn: Optional[str] = Field(None, max_length=120)
+    care_text: Optional[str] = None
+    measurements: Optional[str] = None
+    description: Optional[str] = None
+    current_price: Optional[int] = Field(None, gt=0)
+    old_price: Optional[int] = Field(None, gt=0)
+    status: Optional[Literal["active", "draft", "archived"]] = Field(
+        None, description="active — виден в магазине; draft/archived — скрыт от покупателей"
+    )
+    sizes_stock: Optional[Dict[str, int]] = None
+    materials: Optional[List[ProductMaterialOut]] = None
+    sibling_slugs: Optional[List[str]] = None
+    attributes: Optional[Dict[str, str]] = None
+
+    @field_validator("color_hex")
+    @classmethod
+    def _v_hex(cls, v: Optional[str]) -> Optional[str]:
+        return _check_hex(v)
+
+    @field_validator("sizes_stock")
+    @classmethod
+    def _v_sizes(cls, v: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:
+        return None if v is None else _normalize_sizes(v)
+
+    @field_validator("materials")
+    @classmethod
+    def _v_materials(cls, v: Optional[List[ProductMaterialOut]]) -> Optional[List[ProductMaterialOut]]:
+        return None if v is None else _check_materials(v)
+
+
+class ImageReorderIn(BaseModel):
+    """Новый порядок фото: список id всех фото товара. Первое в списке — главное."""
+    image_ids: List[int] = Field(..., min_length=1)
 
 
 class CrawlQueueItemOut(BaseModel):

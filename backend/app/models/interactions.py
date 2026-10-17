@@ -11,10 +11,12 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -66,6 +68,17 @@ class ProductReview(Base):
     """
 
     __tablename__ = "product_reviews"
+    __table_args__ = (
+        # Один пользователь — один корневой отзыв на товар (ответы parent_id != NULL не ограничиваются)
+        Index(
+            "uq_review_user_product_root",
+            "user_id",
+            "product_id",
+            unique=True,
+            postgresql_where=text("parent_id IS NULL"),
+            sqlite_where=text("parent_id IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     product_id: Mapped[int] = mapped_column(
@@ -78,8 +91,11 @@ class ProductReview(Base):
         Integer, ForeignKey("product_reviews.id", ondelete="CASCADE"), nullable=True
     )
 
-    rating: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=5, comment="Оценка товара от 1 до 5"
+    rating: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        default=5,
+        comment="Оценка товара от 1 до 5. NULL у ответов (parent_id != NULL)",
     )
     comment_text: Mapped[str] = mapped_column(Text, nullable=False)
     advantages: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

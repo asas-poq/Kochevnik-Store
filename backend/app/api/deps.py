@@ -10,7 +10,7 @@
 """
 
 from datetime import datetime, timezone
-from typing import Annotated, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
@@ -116,67 +116,78 @@ async def get_current_admin(
     return current_user
 
 
+def _split_values(values: Optional[List[str]]) -> List[str]:
+    """
+    Приводит параметр фильтра к списку значений. Поддерживает оба стиля:
+    `?color=Серый&color=Бежевый` и `?color=Серый,Бежевый`.
+    """
+    result: List[str] = []
+    for raw in values or []:
+        for part in raw.split(","):
+            part = part.strip()
+            if part and part.lower() not in {r.lower() for r in result}:
+                result.append(part)
+    return result
+
+
 class ProductFilterParams:
     """
-    Класс-зависимость (`Depends(ProductFilterParams)`) для удобной и чистой фильтрации
-    товаров в каталоге `GET /api/v1/products`.
-    Собирает все query-параметры фильтрации, поиска, сортировки и пагинации в один объект.
+    Класс-зависимость (`Depends(ProductFilterParams)`) для `GET /api/v1/products/catalog`.
+    Все фильтры из одной группы работают как ИЛИ (серый ИЛИ бежевый),
+    разные группы объединяются через И (серый И кашемир И размер M).
     """
 
     def __init__(
         self,
-        category: Optional[str] = Query(
+        category: Optional[List[str]] = Query(
             None,
-            description="Фильтр по slug категории (например: zhenskaia-odezhda-iz-kashemira-i-pukha-iaka-i-shersti-verbliuda или kozhanye-izdeliia-iz-mongolii)",
+            description="Slug категории (можно несколько). Включает все вложенные подкатегории",
         ),
-        material: Optional[str] = Query(
-            None,
-            description="Фильтр по материалу (например: кашемир, пух яка, верблюжья шерсть, кожа)",
+        material: Optional[List[str]] = Query(
+            None, description="Материал (можно несколько): кашемир, пух яка, верблюжья шерсть, кожа"
         ),
-        color: Optional[str] = Query(
-            None,
-            description="Фильтр по цвету (например: Бежевый, Молочный, Капучино, Серый, Голубой)",
+        color: Optional[List[str]] = Query(
+            None, description="Цвет (можно несколько): Бежевый, Молочный, Серый..."
         ),
-        size: Optional[str] = Query(
-            None,
-            description="Фильтр по наличию размера на складе (например: S, M, L, ONE SIZE)",
+        size: Optional[List[str]] = Query(
+            None, description="Размер в наличии (можно несколько): S, M, L, ONE SIZE"
         ),
-        min_price: Optional[int] = Query(
-            None, ge=0, description="Минимальная цена в рублях"
-        ),
-        max_price: Optional[int] = Query(
-            None, ge=0, description="Максимальная цена в рублях"
-        ),
+        min_price: Optional[int] = Query(None, ge=0, description="Минимальная цена, ₽"),
+        max_price: Optional[int] = Query(None, ge=0, description="Максимальная цена, ₽"),
         search: Optional[str] = Query(
             None,
-            description="Поисковый запрос по названию товара, артикулу или составу",
+            max_length=100,
+            description="Поиск по названию, артикулу, составу и цвету. Несколько слов — все должны встретиться",
         ),
-        only_in_stock: bool = Query(
-            False, description="Показывать только товары в наличии на складе"
-        ),
-        only_liked: bool = Query(
-            False,
-            description="Показывать только товары из «Избранного» текущего пользователя",
-        ),
+        only_in_stock: bool = Query(False, description="Только товары, которые есть в наличии"),
+        on_sale: bool = Query(False, description="Только товары со скидкой"),
+        only_liked: bool = Query(False, description="Только избранное текущего пользователя (нужна авторизация)"),
         sort: Literal[
-            "price_asc", "price_desc", "newest", "popular", "rating_desc"
+            "popular", "newest", "price_asc", "price_desc", "rating_desc", "discount"
         ] = Query(
             "popular",
-            description="Сортировка: price_asc (дешевле), price_desc (дороже), newest (новинки), popular (по лайкам), rating_desc (по рейтингу)",
+            description=(
+                "popular — хиты (продажи, лайки, отзывы), newest — новинки, price_asc/price_desc — по цене, "
+                "rating_desc — по рейтингу (с поправкой на число отзывов), discount — по размеру скидки"
+            ),
         ),
-        page: int = Query(1, ge=1, description="Номер страницы каталога"),
-        per_page: int = Query(
-            12, ge=1, le=100, description="Количество товаров на одной странице"
-        ),
+        page: int = Query(1, ge=1, description="Номер страницы"),
+        per_page: int = Query(12, ge=1, le=100, description="Товаров на странице"),
     ) -> None:
-        self.category = category
-        self.material = material
-        self.color = color
-        self.size = size
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="min_price не может быть больше max_price.",
+            )
+        self.category = _split_values(category)
+        self.material = _split_values(material)
+        self.color = _split_values(color)
+        self.size = _split_values(size)
         self.min_price = min_price
         self.max_price = max_price
-        self.search = search
+        self.search = (search or "").strip() or None
         self.only_in_stock = only_in_stock
+        self.on_sale = on_sale
         self.only_liked = only_liked
         self.sort = sort
         self.page = page

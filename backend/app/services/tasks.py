@@ -74,6 +74,9 @@ async def recalculate_product_stats_task(product_id: int) -> None:
                 ).where(
                     ProductReview.product_id == product_id,
                     ProductReview.is_approved.is_(True),
+                    # Только корневые отзывы с оценкой: ответы в рейтинг не попадают
+                    ProductReview.parent_id.is_(None),
+                    ProductReview.rating.is_not(None),
                 )
             )
             reviews_count, rating_avg = reviews_q.one()
