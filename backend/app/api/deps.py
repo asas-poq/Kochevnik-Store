@@ -9,14 +9,17 @@
 5. Валидации параметров пагинации и фильтрации каталога (`ProductFilterParams`)
 """
 
+from datetime import datetime, timezone
 from typing import Annotated, Literal, Optional
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.models.session import UserSession
 from app.models.user import User
 
 logger = get_logger(__name__)
@@ -30,25 +33,44 @@ DBSessionDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 async def get_optional_user(
+    request: Request,
     db: DBSessionDep,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> Optional[User]:
     """
-    Опциональная зависимость авторизации (`Depends(get_optional_user)`).
-    Используется на витрине каталога и в карточке товара:
-    - Если клиент передал валидный Bearer JWT-токен — возвращает объект `User`
-      (чтобы показать его лайки `is_liked_by_me` и предзаполнить чекаут).
-    - Если токен не передан (гость) — возвращает `None` без ошибки 401.
+    Опциональная зависимость авторизации.
+    Токен берётся из заголовка `Authorization: Bearer ...`, а если его нет —
+    из httpOnly-cookie `access_token` (её ставят /login и /register).
+    Дополнительно проверяется, что сессия не отозвана (выход аннулирует её).
     """
-    if not credentials or not credentials.credentials:
+    token = credentials.credentials if credentials and credentials.credentials else None
+    if not token:
+        token = request.cookies.get("access_token")
+    if not token:
+        logger.debug("Токен не передан: нет ни заголовка Authorization, ни cookie access_token")
         return None
 
-    payload = decode_token(credentials.credentials)
+    payload = decode_token(token)
     if not payload or payload.get("type") != "access":
         return None
 
     user_id_str = payload.get("sub")
     if not user_id_str or not str(user_id_str).isdigit():
+        return None
+
+    # Сессия должна существовать и быть не отозванной
+    sid = payload.get("sid")
+    if not sid:
+        return None
+    session_ok = await db.execute(
+        select(UserSession.id).where(
+            UserSession.jti == sid,
+            UserSession.revoked_at.is_(None),
+            UserSession.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    if session_ok.scalar_one_or_none() is None:
+        logger.info(f"Сессия {sid} завершена или не найдена")
         return None
 
     user = await db.get(User, int(user_id_str))

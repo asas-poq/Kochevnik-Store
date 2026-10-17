@@ -9,6 +9,15 @@
   python parser.py export              выгрузить CSV в export/
   python parser.py stats               краткая статистика по БД
 
+пример
+  pip install -r requirements.txt
+  python parser.py debug https://ubcashmere.ru/products/bomber-korichnevyi-iz-pukha-iaka/
+  python parser.py discover
+  python parser.py scrape --limit 20
+  python parser.py stats
+  python parser.py scrape
+  python parser.py export
+
 Вежливость: проверка robots.txt, пауза между запросами, повторы при ошибках, докачка после обрыва.
 """
 import argparse

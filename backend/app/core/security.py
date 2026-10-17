@@ -5,6 +5,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
+import uuid
 from typing import Any, Dict, Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -40,6 +41,7 @@ def create_access_token(
     subject: Union[str, int],
     extra_claims: Optional[Dict[str, Any]] = None,
     expires_delta: Optional[timedelta] = None,
+    session_id: Optional[str] = None,
 ) -> str:
     """
     Создает короткоживущий JWT Access-токен для авторизации запросов в API.
@@ -56,6 +58,7 @@ def create_access_token(
         "exp": expire,
         "iat": now,
         "type": "access",
+        "sid": session_id,
     }
     if extra_claims:
         to_encode.update(extra_claims)
@@ -67,7 +70,11 @@ def create_access_token(
     return encoded_jwt
 
 
-def create_refresh_token(subject: Union[str, int]) -> str:
+def create_refresh_token(
+    subject: Union[str, int],
+    session_id: Optional[str] = None,
+    jti: Optional[str] = None,
+) -> str:
     """
     Создает долгоживущий JWT Refresh-токен для обновления сессии пользователя.
     Поле `sub` содержит ID пользователя, поле `type` = 'refresh'.
@@ -79,6 +86,8 @@ def create_refresh_token(subject: Union[str, int]) -> str:
         "exp": expire,
         "iat": now,
         "type": "refresh",
+        "sid": session_id,
+        "jti": jti or uuid.uuid4().hex,
     }
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM

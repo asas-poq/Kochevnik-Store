@@ -18,6 +18,7 @@ from app.models.catalog import (
 )
 from app.models.interactions import ProductLike, ProductReview
 from app.models.order import Order, OrderItem
+from app.models.session import UserSession
 from app.models.user import User
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "ProductSize",
     "ProductAttribute",
     "User",
+    "UserSession",
     "ProductLike",
     "ProductReview",
     "Order",
