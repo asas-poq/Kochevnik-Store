@@ -7,6 +7,7 @@
 - Подключение CORS, статики `/media`, Админ-панели `/admin` (`sqladmin`) и роутера `/api/v1`
 """
 
+import asyncio
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -22,6 +23,8 @@ from app.core.config import settings
 from app.core.logging import get_logger, request_id_ctx_var, setup_logging
 from app.db.base import Base
 from app.db.session import engine
+from app.services.orders import expire_orders_loop
+from app.services.telegram import telegram_service
 from app.services.tasks import import_parser_dump_task
 
 # Инициализируем профессиональный логгер при запуске модуля
@@ -54,8 +57,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.error(f"Ошибка при авто-импорте дампа парсера: {exc}")
 
+    # Предупреждения о небезопасных настройках в боевом окружении
+    if settings.ENVIRONMENT.lower() == "production":
+        if settings.payments_sandbox_mode:
+            logger.critical("PRODUCTION с тестовыми ключами платежей (YOOKASSA_SHOP_ID=test_*)!")
+        if settings.PAYMENT_WEBHOOK_SECRET.startswith("sbp_webhook_secret"):
+            logger.critical("PRODUCTION со стандартным PAYMENT_WEBHOOK_SECRET — смените его в .env!")
+
+    telegram_task = None
+    if telegram_service.is_demo:
+        logger.warning("Telegram: ДЕМО-РЕЖИМ (токен не задан) — уведомления только в логе.")
+    else:
+        logger.info(
+            f"Telegram: уведомления включены (личка={settings.TELEGRAM_OWNER_CHAT_ID}, "
+            f"группа={settings.TELEGRAM_STAFF_CHAT_ID or 'не задана'}, "
+            f"приём кнопок={settings.TELEGRAM_UPDATES_MODE})."
+        )
+        if settings.TELEGRAM_UPDATES_MODE == "polling":
+            telegram_task = asyncio.create_task(telegram_service.polling_loop())
+
+    # Фоновая автоотмена неоплаченных заказов (возврат остатков на склад)
+    expire_task = asyncio.create_task(expire_orders_loop())
+
     yield
 
+    for task in (expire_task, telegram_task):
+        if task is None:
+            continue
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     logger.info("Остановка приложения, закрываем соединения с БД...")
     await engine.dispose()
 
@@ -65,8 +98,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description=(
-        "Профессиональный асинхронный бэкенд интернет-магазина монгольского кашемира, "
-        "пуха яка, верблюжьей шерсти и кожаных изделий **Ulaanbaatar**.\n\n"
+        "Профессиональный асинхронный бэкенд интернет-магазина Kochevnik.\n\n"
         "### Ключевые возможности:\n"
         "- **Полная совместимость с БД парсера** (`categories`, `products`, `price_history`, "
         "`product_images`, `product_materials`, `product_color_links`, `crawl_queue`)\n"

@@ -3,7 +3,7 @@ Pydantic v2 схемы для оформления заказа (Чекаут), 
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -82,23 +82,71 @@ class OrderOut(BaseModel):
     )
     created_at: datetime
     paid_at: Optional[datetime] = None
+    payment_expires_at: Optional[datetime] = Field(
+        None, description="До какого времени можно оплатить заказ (только для статуса pending)"
+    )
     items: List[OrderItemOut] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class AdminOrderStatusIn(BaseModel):
+    """Смена статуса оплаченного заказа администратором."""
+    status: Literal["shipped", "completed"] = Field(
+        ..., description="shipped — передан в доставку, completed — вручен покупателю"
+    )
+
+
+class SandboxPaymentOut(BaseModel):
+    """Результат имитации оплаты в песочнице."""
+    order_id: int
+    outcome: str
+    order_status: str
+    result: str
+    message: str
+
+
 class SBPWebhookPayload(BaseModel):
     """
-    Универсальная схема входящего вебхука от платежного шлюза (ЮKassa / Т-Касса)
-    на эндпоинт `POST /api/v1/payments/webhook`.
+    Схема входящего вебхука платежного шлюза на `POST /api/v1/payments/webhook`.
+    Поддерживает два формата:
+    - собственный плоский (`event`, `payment_id`, `order_id`, `amount`, `secret_signature`) —
+      им пользуется песочница и ручное тестирование;
+    - нативный формат ЮKassa: `{"type": "notification", "event": "payment.succeeded",
+      "object": {"id": "...", "amount": {"value": "1000.00"}, "metadata": {"order_id": "5"}}}`.
     """
     event: str = Field(
         ..., description="Тип события, например 'payment.succeeded' или 'payment.canceled'"
     )
-    payment_id: str = Field(..., description="Уникальный ID транзакции в платежной системе")
-    order_id: int = Field(..., description="Внутренний номер заказа в нашем магазине")
+    payment_id: Optional[str] = Field(None, description="ID транзакции в платежной системе")
+    order_id: Optional[int] = Field(None, description="Внутренний номер заказа")
     amount: Optional[int] = Field(None, description="Сумма платежа в рублях")
     secret_signature: Optional[str] = Field(
-        None, description="Подпись или секретный ключ для проверки подлинности вебхука"
+        None, description="Секрет вебхука (альтернатива заголовку X-Webhook-Secret)"
     )
     raw_object: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    yk_object: Optional[Dict[str, Any]] = Field(
+        None, alias="object", description="Нативный объект платежа ЮKassa"
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    def normalized(self) -> Tuple[Optional[str], Optional[int], Optional[int]]:
+        """Возвращает `(payment_id, order_id, amount)` из любого из двух форматов."""
+        obj = self.yk_object or {}
+        payment_id = self.payment_id or obj.get("id")
+
+        order_id = self.order_id
+        if order_id is None:
+            try:
+                order_id = int((obj.get("metadata") or {}).get("order_id"))
+            except (TypeError, ValueError):
+                order_id = None
+
+        amount = self.amount
+        if amount is None and isinstance(obj.get("amount"), dict):
+            try:
+                amount = int(float(obj["amount"]["value"]))
+            except (KeyError, TypeError, ValueError):
+                amount = None
+        return payment_id, order_id, amount

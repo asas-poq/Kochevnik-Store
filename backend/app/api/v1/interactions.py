@@ -35,12 +35,8 @@ router = APIRouter(prefix="/interactions", tags=["4. Лайки (Избранн�
 # Если True — новые и отредактированные отзывы попадают на премодерацию (is_approved=False).
 REVIEWS_PREMODERATION = False
 
-# Статусы заказа, при которых покупка считается подтверждённой.
-VERIFIED_ORDER_STATUSES = (
-    OrderStatus.PAID.value,
-    OrderStatus.SHIPPED.value,
-    OrderStatus.COMPLETED.value,
-)
+# Отзыв можно оставить только после того, как продавец отметил заказ доставленным (completed).
+VERIFIED_ORDER_STATUSES = (OrderStatus.COMPLETED.value,)
 
 
 class ReviewSort(str, Enum):
@@ -375,8 +371,10 @@ async def create_product_review(
     1. Корневой отзыв: не более одного на товар от одного пользователя (иначе 409), оценка обязательна.
     2. Ответ: `parent_id` должен существовать, быть одобренным корневым отзывом этого же товара;
        оценка у ответов не сохраняется и в рейтинг не попадает.
-    3. Автоматически проверяет по базе заказов, покупал ли клиент этот товар раньше,
-       и ставит `is_verified_purchase = True` («Подтвержденная покупка»).
+    3. Корневой отзыв (с оценкой) можно оставить ТОЛЬКО после получения товара: у пользователя
+       должен быть заказ с этим товаром в статусе `completed` (его выставляет продавец через
+       `PATCH /orders/admin/{id}/status`). Иначе — 403. Отзыв получает `is_verified_purchase = True`.
+       Ответы на чужие отзывы (`parent_id`) доступны любому авторизованному пользователю.
     4. В фоне пересчитывает средний рейтинг товара.
     """
     await _ensure_product_exists(db, product_id)
@@ -425,6 +423,12 @@ async def create_product_review(
         .limit(1)
     )
     is_verified = purchase_q.scalar_one_or_none() is not None
+
+    if payload.parent_id is None and not is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Оставить отзыв можно только после получения заказа с этим товаром.",
+        )
 
     review = ProductReview(
         product_id=product_id,
