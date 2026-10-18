@@ -18,10 +18,10 @@
 | `app/models/interactions.py` | Таблицы лайков/избранного (`product_likes`) и древовидных отзывов/комментариев (`product_reviews`) |
 | `app/models/order.py` | Таблицы заказов (`orders`) и позиций заказа (`order_items`) с доставкой СДЭК/Почта/Шоурум и СБП |
 | `app/api/deps.py` | Переиспользуемые зависимости `Depends`: `DBSessionDep`, `CurrentUserDep`, `OptionalUserDep`, `AdminUserDep`, `ProductFilterDep` |
-| `app/api/v1/` | Роутеры: `auth.py`, `categories.py`, `products.py`, `interactions.py`, `orders.py`, `webhooks.py`, `parser_sync.py` |
-| `app/services/` | Асинхронные сервисы: `s3.py` (S3/MinIO фото), `payment_sbp.py` (ЮKassa СБП), `telegram.py` (Telegram-бот), `tasks.py` (`BackgroundTasks`) |
+| `app/api/v1/` | Роутеры: `auth.py`, `categories.py`, `products.py`, `interactions.py`, `orders.py`, `webhooks.py`, `parser_sync.py` (управление парсером) |
+| `app/services/` | Асинхронные сервисы: `s3.py` (S3/MinIO фото), `payment_sbp.py` (ЮKassa СБП), `telegram.py` (Telegram-бот), `tasks.py` (`BackgroundTasks`) и **`parser.py`** (парсер `ubcashmere.ru`, пишет напрямую в основную БД) |
 | `app/admin/views.py` | Готовая админ-панель `sqladmin` по адресу `/admin` для всех 14 таблиц |
-| `data/parsed_dump.json` | Полный JSON-дамп вашего парсера (2 категории, 11 спарсенных товаров, 102 фото, материалы, связи цветов, 193 ссылки в очереди `crawl_queue`) |
+| `data/parsed_dump.json` | Первичный JSON-дамп парсера (2 категории, 11 спарсенных товаров, 102 фото, материалы, связи цветов, 193 ссылки в очереди `crawl_queue`). Нужен только для первичной загрузки через `seed_from_parser.py`; дальше парсер пишет в БД сам |
 | `scripts/seed_from_parser.py` | Скрипт первичного импорта всех данных парсера и создания тестовых аккаунтов |
 
 ## Быстрый старт
@@ -55,6 +55,69 @@ uvicorn app.main:app --reload --port 8000
 ## Тестовые учетные записи (создаются скриптом `seed_from_parser.py`)
 - **Администратор магазина**: `admin@ubcashmere.ru` / пароль: `Admin123!`
 - **Покупатель**: `anna@example.com` / пароль: `Customer123!`
+
+
+## Парсер каталога (`/api/v1/parser`)
+
+Парсер `app/services/parser.py` собирает товары с `ubcashmere.ru` и **пишет их напрямую в основную БД** бэкенда. Схема работы:
+
+```
+запрос к ручке API → фоновая задача → app/services/parser.py → основная БД
+```
+
+**Подключение к БД.** Парсер берёт его только из `Settings` (`DATABASE_URL` или `POSTGRES_*` в `.env`), поэтому всегда пишет в ту же базу, что и API — PostgreSQL или SQLite, неважно. Никаких отдельных настроек парсера в `config.py` нет: адрес сайта, пауза между запросами, User-Agent и прочие мелкие параметры лежат константами в начале `parser.py`.
+
+**Что нужно для работы:**
+- таблицы уже созданы бэкендом (`create_all` при запуске или `seed_from_parser.py`) — парсер их не создаёт;
+- установлены зависимости: `requests`, `beautifulsoup4`, `lxml`, а для PostgreSQL ещё `psycopg2-binary` (парсер синхронный, поэтому `asyncpg` ему не подходит; замена драйвера делается автоматически);
+- в константе `USER_AGENT` в `parser.py` указан ваш email, чтобы владелец сайта мог с вами связаться.
+
+### Ручки управления
+
+| Метод | Путь | Доступ | Описание |
+| --- | --- | --- | --- |
+| POST | `/parser/discover` | — | Шаг 1: найти URL товаров (sitemap, иначе обход каталога) и добавить новые в `crawl_queue` |
+| POST | `/parser/scrape?limit&retry_errors` | — | Шаг 2: спарсить карточки из очереди и записать в основную БД. `limit` — сколько обработать за запуск, `retry_errors=true` — повторить ссылки со статусом `error` |
+| GET | `/parser/preview?url&save_html` | — | Разобрать одну страницу и показать результат, **в БД ничего не пишет** (проверка парсера). Принимает только ссылки на `ubcashmere.ru` |
+| GET | `/parser/status` | — | Идёт ли сейчас задача парсера и чем закончилась последняя (`result` или `error`) |
+| GET | `/parser/queue/stats` | — | Сколько ссылок в очереди: `done` / `pending` / `error` |
+| GET | `/parser/queue?status_filter&limit` | — | Список ссылок из очереди |
+| POST | `/parser/sync-dump?json_path` | — | *(устарело)* Импорт готового JSON-дампа; оставлено для совместимости |
+
+`discover` и `scrape` выполняются в фоне и сразу отвечают `202`. Одновременно работает только одна задача: пока парсер занят, новый запуск вернёт `409`. Состояние задачи хранится в памяти процесса и сбрасывается при перезапуске (при нескольких воркерах uvicorn защита от двойного запуска не сработает).
+
+Каждый товар сохраняется в отдельной транзакции вместе со статусом `done` в очереди, поэтому ошибка на одной карточке не останавливает обход, а прерванный запуск можно просто повторить — парсер продолжит с `pending`.
+
+### Типичный порядок действий
+
+```bash
+# 1) проверить разбор одной карточки (в БД не пишется)
+curl "http://localhost:8000/api/v1/parser/preview?url=https://ubcashmere.ru/products/<slug>/"
+
+# 2) собрать ссылки на товары
+curl -X POST http://localhost:8000/api/v1/parser/discover
+
+# 3) пробный запуск на 20 карточках, затем полный
+curl -X POST "http://localhost:8000/api/v1/parser/scrape?limit=20"
+curl -X POST "http://localhost:8000/api/v1/parser/scrape"
+
+# 4) следить за ходом
+curl http://localhost:8000/api/v1/parser/status
+curl http://localhost:8000/api/v1/parser/queue/stats
+```
+
+### Запуск из командной строки
+
+Та же логика доступна без API (из корня проекта):
+
+```bash
+python -m app.services.parser discover
+python -m app.services.parser scrape --limit 20
+python -m app.services.parser scrape --retry-errors
+python -m app.services.parser debug https://ubcashmere.ru/products/<slug>/
+python -m app.services.parser stats
+python -m app.services.parser export     # CSV в data/parser/export
+```
 
 
 ## Лайки и отзывы (`/api/v1/interactions`)

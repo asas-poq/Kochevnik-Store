@@ -1,19 +1,41 @@
 """
-Роутер интеграции с парсером (`app/api/v1/parser_sync.py`).
-Позволяет:
-1. Посмотреть статистику очереди парсера (`crawl_queue`: сколько ссылок `done`, сколько `pending`, сколько `error`)
-2. Получить список ссылок из `crawl_queue` для воркера парсера
-3. Запустить фоновую синхронизацию (`BackgroundTasks`) JSON-дампа парсера в базу данных
+Роутер управления парсером (`app/api/v1/parser_sync.py`).
+
+Схема работы:
+    клиент -> ручка API -> фоновая задача -> app/services/parser.py -> ОСНОВНАЯ БД (из Settings)
+
+Парсер сам подключается к основной базе (PostgreSQL / SQLite — как указано в `.env`)
+и пишет туда товары напрямую, поэтому передавать ему путь к БД или файлы не нужно.
+Ручки передают парсеру только параметры самой задачи (limit, retry_errors, url).
+
+Ручки:
+  GET  /parser/status          — идёт ли сейчас задача парсера и чем она закончилась
+  GET  /parser/queue/stats     — сколько ссылок done / pending / error
+  GET  /parser/queue           — список ссылок из очереди (с фильтром по статусу)
+  POST /parser/discover        — найти URL товаров и добавить новые в очередь
+  POST /parser/scrape          — обработать очередь (limit, retry_errors)
+  GET  /parser/preview         — разобрать одну страницу, НЕ записывая в БД (проверка парсера)
+  POST /parser/sync-dump       — (устаревшее) импорт JSON-дампа; оставлено для совместимости
 """
 
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, BackgroundTasks, Query
+from typing import Any, Callable, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 
 from app.api.deps import DBSessionDep
 from app.core.logging import get_logger
 from app.models.catalog import CrawlQueue
 from app.schemas.catalog import CrawlQueueItemOut
+from app.services.parser import (
+    get_job_status,
+    preview_product,
+    run_discover,
+    run_job,
+    run_scrape,
+    start_job,
+)
 from app.services.tasks import import_parser_dump_task
 
 logger = get_logger(__name__)
@@ -21,87 +43,123 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/parser", tags=["7. Синхронизация с Парсером и Очередь (Crawl Queue)"])
 
 
-# ==============================================================================
-# РУЧКА 1: Статистика очереди парсера (done / pending / error)
-# ==============================================================================
-@router.get(
-    "/queue/stats",
-    summary="Статистика очереди парсера (crawl_queue)",
-)
-async def get_crawl_queue_stats(
-    db: DBSessionDep,
+def _schedule(
+    background_tasks: BackgroundTasks,
+    job_name: str,
+    func: Callable[..., Any],
+    **params: Any,
 ) -> Dict[str, Any]:
     """
-    Возвращает сводную статистику по таблице `crawl_queue` из вашего парсера:
-    общее число найденных ссылок на товары `ubcashmere.ru`, сколько уже спарсено (`done`)
-    и сколько ожидают обхода (`pending`).
+    Общий запуск фоновой задачи парсера.
+    Если парсер уже занят — отвечаем 409, чтобы два обхода не работали одновременно
+    (иначе они бы бились за одни и те же ссылки очереди и нагружали сайт).
     """
-    logger.info("Запрос статистики очереди парсера GET /api/v1/parser/queue/stats")
-    rows = (
-        await db.execute(
-            select(CrawlQueue.status, func.count(CrawlQueue.id)).group_by(
-                CrawlQueue.status
-            )
+    if not start_job(job_name):
+        raise HTTPException(
+            status_code=409,
+            detail="Парсер уже выполняет задачу. Состояние смотрите в GET /api/v1/parser/status",
         )
+    # run_job — обычная (не async) функция, Starlette выполнит её в пуле потоков,
+    # поэтому блокирующие запросы парсера не вешают event loop приложения.
+    background_tasks.add_task(run_job, job_name, func, **params)
+    logger.info(f"Парсер: задача '{job_name}' поставлена в фон, параметры: {params}")
+    return {"status": "scheduled", "job": job_name, "params": params}
+
+
+# ==============================================================================
+# Состояние парсера
+# ==============================================================================
+@router.get("/status", summary="Состояние парсера: идёт ли задача и чем закончилась последняя")
+async def get_parser_status() -> Dict[str, Any]:
+    """
+    Возвращает: имя задачи, `running` (идёт ли сейчас), время старта/окончания,
+    `result` (например `{"total": 20, "ok": 19, "errors": 1}`) или `error`, если задача упала.
+    Состояние хранится в памяти процесса и сбрасывается при перезапуске бэкенда.
+    """
+    return get_job_status()
+
+
+# ==============================================================================
+# Очередь (crawl_queue)
+# ==============================================================================
+@router.get("/queue/stats", summary="Статистика очереди парсера (crawl_queue)")
+async def get_crawl_queue_stats(db: DBSessionDep) -> Dict[str, Any]:
+    """Сколько всего ссылок в `crawl_queue` и сколько в каждом статусе (done / pending / error)."""
+    rows = (
+        await db.execute(select(CrawlQueue.status, func.count(CrawlQueue.id)).group_by(CrawlQueue.status))
     ).all()
-
     by_status = {status_name: count for status_name, count in rows}
-    total = sum(by_status.values())
-    return {
-        "total_urls": total,
-        "by_status": by_status,
-    }
+    return {"total_urls": sum(by_status.values()), "by_status": by_status}
 
 
-# ==============================================================================
-# РУЧКА 2: Получить ссылки из очереди парсера (например, все pending для обхода)
-# ==============================================================================
 @router.get(
     "/queue",
     response_model=List[CrawlQueueItemOut],
-    summary="Получить список URL из очереди парсера (crawl_queue)",
+    summary="Список URL из очереди парсера (crawl_queue)",
 )
 async def list_crawl_queue(
     db: DBSessionDep,
-    status_filter: Optional[str] = Query(
-        None, description="Фильтр по статусу: done, pending, error"
-    ),
+    status_filter: Optional[str] = Query(None, description="Фильтр по статусу: done, pending, error"),
     limit: int = Query(50, ge=1, le=300),
 ) -> List[CrawlQueueItemOut]:
-    """
-    Отдает список URL из таблицы `crawl_queue`.
-    Ваш парсер может обращаться к этой ручке с параметром `?status_filter=pending`,
-    чтобы брать следующую пачку товаров для парсинга.
-    """
+    """Отдаёт ссылки из `crawl_queue` по порядку добавления — удобно смотреть, что ждёт обхода или упало."""
     stmt = select(CrawlQueue).order_by(CrawlQueue.id.asc()).limit(limit)
     if status_filter:
         stmt = stmt.where(CrawlQueue.status == status_filter)
-
     items = (await db.execute(stmt)).scalars().all()
     return [CrawlQueueItemOut.model_validate(item) for item in items]
 
 
 # ==============================================================================
-# РУЧКА 3: Запустить импорт JSON-дампа парсера в фоне
+# Запуск парсера
 # ==============================================================================
 @router.post(
-    "/sync-dump",
-    summary="Запустить синхронизацию JSON-дампа парсера (data/parsed_dump.json) в фоновом режиме",
+    "/discover",
+    status_code=202,
+    summary="Шаг 1: найти все URL товаров и добавить новые в очередь",
 )
-async def trigger_parser_dump_sync(
+async def trigger_discover(background_tasks: BackgroundTasks) -> Dict[str, Any]:
+    """
+    Парсер читает sitemap сайта (если пуст — обходит каталог) и добавляет новые ссылки
+    в `crawl_queue` со статусом `pending`. Уже известные ссылки не дублируются.
+    """
+    return _schedule(background_tasks, "discover", run_discover)
+
+
+@router.post(
+    "/scrape",
+    status_code=202,
+    summary="Шаг 2: спарсить карточки товаров из очереди и записать в основную БД",
+)
+async def trigger_scrape(
     background_tasks: BackgroundTasks,
-    json_path: str = Query(
-        "data/parsed_dump.json",
-        description="Путь к JSON-файлу с выгрузкой парсера",
+    limit: Optional[int] = Query(
+        None, ge=1, description="Сколько карточек обработать за запуск (пусто — вся очередь)"
     ),
-) -> Dict[str, str]:
+    retry_errors: bool = Query(False, description="Заодно повторить ссылки со статусом error"),
+) -> Dict[str, Any]:
     """
-    Запускает асинхронную фоновую задачу (`BackgroundTasks`) импорта всех категорий,
-    товаров, фотографий, материалов, связей цветов и очереди `crawl_queue` из JSON-файла парсера.
+    Берёт ссылки `pending` (и `error`, если `retry_errors=true`), скачивает карточки
+    и сохраняет товары, фото, размеры, материалы и историю цен в основную БД.
+    Для пробы можно начать с `?limit=20`.
     """
-    logger.info(f"Запуск фоновой синхронизации дампа парсера из файла: {json_path}")
-    background_tasks.add_task(import_parser_dump_task, json_path)
-    return {
-        "status": "scheduled",
-        "message": f"Фоновая задача импорта данных парсера из '{json_path}' успешно запущена.",
-    }
+    return _schedule(background_tasks, "scrape", run_scrape, limit=limit, retry_errors=retry_errors)
+
+
+@router.get("/preview", summary="Проверка: разобрать одну страницу товара без записи в БД")
+async def preview_page(
+    url: str = Query(..., description="Полная ссылка на карточку, например https://ubcashmere.ru/products/<slug>/"),
+    save_html: bool = Query(False, description="Сохранить скачанный HTML в data/parser/debug"),
+) -> Dict[str, Any]:
+    """Аналог `parser.py debug`: показывает, что парсер «видит» на странице. В БД ничего не пишется."""
+    try:
+        # парсер блокирующий (requests + пауза), поэтому уводим его в поток
+        product = await run_in_threadpool(preview_product, url, save_html)
+    except ValueError as e:  # URL чужого сайта
+        raise HTTPException(status_code=400, detail=str(e))
+    if product is None:
+        raise HTTPException(status_code=404, detail="Страница не скачалась или это не карточка товара")
+    return product
+
+
+
