@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тестовая оплата СБП, заказ #$order_id</title>
+<style>
+ body{font-family:system-ui,sans-serif;background:#f4f1ec;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center}
+ .card{background:#fff;border-radius:16px;padding:32px;max-width:380px;width:92%;box-shadow:0 8px 30px rgba(0,0,0,.08);text-align:center}
+ .badge{display:inline-block;background:#fff3cd;color:#7a5b00;border-radius:8px;padding:4px 10px;font-size:12px;margin-bottom:12px}
+ .sum{font-size:34px;font-weight:700;margin:8px 0 4px}
+ button{width:100%;padding:14px;border:0;border-radius:10px;font-size:16px;cursor:pointer;margin-top:10px}
+ .pay{background:#1f8f4e;color:#fff} .cancel{background:#eee;color:#333}
+ button:disabled{opacity:.5;cursor:default} #msg{margin-top:16px;font-size:14px;min-height:20px}
+</style></head><body><div class="card">
+ <div class="badge">ТЕСТОВЫЙ РЕЖИМ, деньги не списываются</div>
+ <div>Заказ #$order_id</div>
+ <div class="sum">$amount ₽</div>
+ <div style="color:#777;font-size:14px">Статус заказа: <b id="st">$order_status</b></div>
+ <button class="pay" id="pay" $disabled>Оплатить по СБП</button>
+ <button class="cancel" id="cancel" $disabled>Отменить платёж</button>
+ <div id="msg"></div>
+</div>
+<script>
+ async function simulate(outcome){
+   document.getElementById('pay').disabled = true;
+   document.getElementById('cancel').disabled = true;
+   const r = await fetch('$api/payments/sandbox/orders/$order_id/simulate?outcome=' + outcome, {method:'POST'});
+   const d = await r.json();
+   document.getElementById('msg').textContent = d.message || d.detail || 'Ошибка';
+   if (d.order_status) document.getElementById('st').textContent = d.order_status;
+ }
+ document.getElementById('pay').onclick = () => simulate('succeeded');
+ document.getElementById('cancel').onclick = () => simulate('canceled');
+</script></body></html>
