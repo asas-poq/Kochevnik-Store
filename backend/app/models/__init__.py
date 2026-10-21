@@ -1,9 +1,3 @@
-"""
-Единая точка экспорта всех моделей SQLAlchemy (`app/models/__init__.py`).
-Импорт этого пакета гарантирует, что все таблицы зарегистрированы в `Base.metadata`
-для автогенерации миграций Alembic и создания таблиц.
-"""
-
 from app.models.catalog import (
     Category,
     CrawlQueue,
@@ -17,27 +11,27 @@ from app.models.catalog import (
     Source,
 )
 from app.models.interactions import ProductLike, ProductReview
-from app.models.order import Order, OrderItem
-from app.models.session import UserSession
-from app.models.telegram_message import OrderTelegramMessage
-from app.models.user import User
+from app.models.order import Order, OrderItem, OrderStatus, OrderTelegramMessage, PaymentEvent
+from app.models.user import User, UserSession
 
 __all__ = [
-    "Source",
     "Category",
     "CrawlQueue",
-    "Product",
-    "PriceHistory",
-    "ProductImage",
-    "ProductMaterial",
-    "ProductColorLink",
-    "ProductSize",
-    "ProductAttribute",
-    "User",
-    "UserSession",
-    "ProductLike",
-    "ProductReview",
     "Order",
     "OrderItem",
+    "OrderStatus",
     "OrderTelegramMessage",
+    "PaymentEvent",
+    "PriceHistory",
+    "Product",
+    "ProductAttribute",
+    "ProductColorLink",
+    "ProductImage",
+    "ProductLike",
+    "ProductMaterial",
+    "ProductReview",
+    "ProductSize",
+    "Source",
+    "User",
+    "UserSession",
 ]

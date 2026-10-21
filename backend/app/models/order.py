@@ -1,25 +1,15 @@
-"""
-Модели заказов, позиций заказа и платежей СБП (`app/models/order.py`).
-Реализуют бизнес-логику чекаута, доставки (СДЭК ПВЗ/курьер, Почта России, Самовывоз из шоурума)
-и оплаты через Систему Быстрых Платежей (ЮKassa / Т-Касса).
-"""
-
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-from typing import List, Optional
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+
+from sqlalchemy import BigInteger, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+from app.db.types import UTCDateTime, utc_now
+from app.models.catalog import Product
 
 
 class OrderStatus(str, Enum):
-    """Статусы заказа (значения хранятся в `orders.status` как строки)."""
-
     PENDING = "pending"
     PAID = "paid"
     SHIPPED = "shipped"
@@ -28,105 +18,85 @@ class OrderStatus(str, Enum):
 
 
 class Order(Base):
-    """
-    Таблица `orders` — заказы покупателей.
-    Статусы заказа (`status`):
-    - `pending` — создан, товар зарезервирован, ожидает оплаты по СБП
-    - `paid` — успешно оплачен по QR-коду СБП (подтвержден вебхуком банка)
-    - `shipped` — передан в доставку (СДЭК / Почта России)
-    - `completed` — вручен покупателю
-    - `cancelled` — отменен (остатки товара возвращены на склад)
-    """
-
     __tablename__ = "orders"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    __table_args__ = (
+        Index("ix_orders_user_created", "user_id", "created_at"),
+        Index("ix_orders_status_created", "status", "created_at"),
     )
 
-    # Контактные данные покупателя на момент оформления
-    customer_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    customer_phone: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    customer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    customer_name: Mapped[str] = mapped_column(String(150))
+    customer_phone: Mapped[str] = mapped_column(String(32), index=True)
+    customer_email: Mapped[str | None] = mapped_column(String(255))
 
-    # Параметры логистики и доставки
-    delivery_method: Mapped[str] = mapped_column(
-        String(50),
-        nullable=False,
-        default="cdek_pvz",
-        comment="cdek_pvz | cdek_courier | russian_post | showroom_pickup",
-    )
-    delivery_city: Mapped[str] = mapped_column(String(120), nullable=False, default="Москва")
-    delivery_address: Mapped[str] = mapped_column(
-        String(500), nullable=False, comment="Адрес курьерской доставки или код/адрес ПВЗ СДЭК"
-    )
-    cdek_pvz_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    customer_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # cdek_pvz, cdek_courier, russian_post или showroom_pickup
+    delivery_method: Mapped[str] = mapped_column(String(50), default="cdek_pvz")
+    delivery_city: Mapped[str] = mapped_column(String(120), default="Москва")
+    delivery_address: Mapped[str] = mapped_column(String(500))
+    cdek_pvz_code: Mapped[str | None] = mapped_column(String(64))
+    customer_comment: Mapped[str | None] = mapped_column(Text)
 
-    # Финансовые итоги заказа (в рублях)
-    items_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    delivery_cost: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="Бесплатно от 15 000 ₽"
-    )
-    total_amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB")
+    items_total: Mapped[int] = mapped_column(Integer, default=0)
+    delivery_cost: Mapped[int] = mapped_column(Integer, default=0)
+    total_amount: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(10), default="RUB")
 
-    # Статус заказа и данные платежа СБП
-    status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="pending", index=True
-    )
-    payment_id: Mapped[Optional[str]] = mapped_column(
-        String(120), unique=True, index=True, nullable=True, comment="ID платежа в ЮKassa / Т-Кассе"
-    )
-    payment_url: Mapped[Optional[str]] = mapped_column(
-        String(500), nullable=True, comment="Ссылка на QR-код СБП для редиректа клиента"
-    )
+    status: Mapped[str] = mapped_column(String(32), default=OrderStatus.PENDING.value, index=True)
+    payment_id: Mapped[str | None] = mapped_column(String(120), unique=True, index=True)
+    payment_url: Mapped[str | None] = mapped_column(String(500))
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
-    )
-    paid_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+    paid_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
-    # Связи
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="orders")
-    items: Mapped[List["OrderItem"]] = relationship(
-        "OrderItem", back_populates="order", cascade="all, delete-orphan"
-    )
-
-    def __repr__(self) -> str:
-        return f"<Order id={self.id} status={self.status} total={self.total_amount}>"
+    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
-    """
-    Таблица `order_items` — товарные позиции внутри конкретного заказа.
-    Фиксирует название, цвет, размер и цену товара на момент покупки.
-    """
-
     __tablename__ = "order_items"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    product_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
-    )
-    variant_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("product_sizes.id", ondelete="SET NULL"), nullable=True
-    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), index=True)
+    variant_id: Mapped[int | None] = mapped_column(ForeignKey("product_sizes.id", ondelete="SET NULL"))
 
-    product_name: Mapped[str] = mapped_column(String(300), nullable=False)
-    product_slug: Mapped[str] = mapped_column(String(255), nullable=False)
-    color: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
-    size: Mapped[str] = mapped_column(String(32), nullable=False, default="ONE SIZE")
+    product_name: Mapped[str] = mapped_column(String(300))
+    product_slug: Mapped[str] = mapped_column(String(255))
+    color: Mapped[str | None] = mapped_column(String(80))
+    size: Mapped[str] = mapped_column(String(32), default="ONE SIZE")
 
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    unit_price: Mapped[int] = mapped_column(Integer, nullable=False)
-    subtotal: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    unit_price: Mapped[int] = mapped_column(Integer)
+    subtotal: Mapped[int] = mapped_column(Integer)
 
-    order: Mapped["Order"] = relationship("Order", back_populates="items")
-    product: Mapped["Product"] = relationship("Product")
+    order: Mapped[Order] = relationship(back_populates="items")
+    product: Mapped[Product] = relationship()
+
+
+class OrderTelegramMessage(Base):
+    """Последнее сообщение по заказу в каждом чате: owner (личка) и staff (группа)."""
+
+    __tablename__ = "order_telegram_messages"
+    __table_args__ = (UniqueConstraint("order_id", "role", name="uq_order_telegram_role"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(16))
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    message_id: Mapped[int] = mapped_column(BigInteger)
+
+
+class PaymentEvent(Base):
+    """Обработанные уведомления шлюза. Повтор того же события отвечает duplicate и ничего не меняет."""
+
+    __tablename__ = "payment_events"
+    __table_args__ = (UniqueConstraint("payment_id", "event", name="uq_payment_event"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    payment_id: Mapped[str] = mapped_column(String(120))
+    event: Mapped[str] = mapped_column(String(40))
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    result: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)

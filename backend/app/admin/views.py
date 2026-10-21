@@ -1,265 +1,168 @@
-"""
-Модуль настройки Админ-панели на базе `sqladmin` (`app/admin/views.py`).
-Предоставляет удобный веб-интерфейс по адресу `http://localhost:8000/admin`
-для управления товарами, остатками, фотографиями, категориями, очередью парсера,
-отзывами покупателей и заказами.
-"""
-
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
+from sqladmin.authentication import AuthenticationBackend
+from starlette.requests import Request
 
-from app.core.logging import get_logger
-from app.db.session import engine
-from app.models.catalog import (
+from app.core.config import settings
+from app.core.security import verify_password
+from app.db.session import AsyncSessionLocal, engine
+from app.models import (
     Category,
     CrawlQueue,
+    Order,
+    OrderItem,
     PriceHistory,
     Product,
     ProductColorLink,
     ProductImage,
+    ProductLike,
     ProductMaterial,
+    ProductReview,
     ProductSize,
     Source,
+    User,
 )
-from app.models.interactions import ProductLike, ProductReview
-from app.models.order import Order, OrderItem
-from app.models.user import User
+from sqlalchemy import select
 
-logger = get_logger(__name__)
+
+class AdminAuth(AuthenticationBackend):
+    """Вход в панель по email и паролю существующего пользователя с ролью admin."""
+
+    async def login(self, request: Request) -> bool:
+        form = await request.form()
+        email = str(form.get("username", "")).strip().lower()
+        async with AsyncSessionLocal() as db:
+            user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if not (user and user.is_admin and user.is_active):
+            return False
+        if not verify_password(str(form.get("password", "")), user.hashed_password):
+            return False
+        request.session["admin_id"] = user.id
+        return True
+
+    async def logout(self, request: Request) -> bool:
+        request.session.clear()
+        return True
+
+    async def authenticate(self, request: Request) -> bool:
+        admin_id = request.session.get("admin_id")
+        if not admin_id:
+            return False
+        async with AsyncSessionLocal() as db:
+            user = await db.get(User, admin_id)
+        return bool(user and user.is_admin and user.is_active)
 
 
 class ProductAdmin(ModelView, model=Product):
-    """Управление карточками товаров в админ-панели."""
-    name = "Товар"
-    name_plural = "Товары (Каталог)"
-    icon = "fa-solid fa-shirt"
+    name, name_plural, icon = "Товар", "Товары", "fa-solid fa-shirt"
     column_list = [
-        Product.id,
-        Product.article,
-        Product.name,
-        Product.color,
-        Product.composition,
-        Product.current_price,
-        Product.old_price,
-        Product.likes_count,
-        Product.reviews_count,
-        Product.status,
-    ]
+        Product.id, Product.article, Product.name, Product.color, Product.current_price,
+        Product.old_price, Product.likes_count, Product.reviews_count, Product.status,
+    ]  # fmt: skip
     column_searchable_list = [Product.name, Product.slug, Product.article, Product.color]
-    column_sortable_list = [
-        Product.id,
-        Product.current_price,
-        Product.likes_count,
-        Product.reviews_count,
-    ]
+    column_sortable_list = [Product.id, Product.current_price, Product.likes_count, Product.reviews_count]
 
 
 class CategoryAdmin(ModelView, model=Category):
-    """Управление категориями товаров."""
-    name = "Категория"
-    name_plural = "Категории"
-    icon = "fa-solid fa-folder-tree"
+    name, name_plural, icon = "Категория", "Категории", "fa-solid fa-folder-tree"
     column_list = [Category.id, Category.name, Category.slug, Category.parent_id]
     column_searchable_list = [Category.name, Category.slug]
 
 
 class ProductSizeAdmin(ModelView, model=ProductSize):
-    """Управление размерами и складскими остатками (`stock`)."""
-    name = "Размер / Остаток"
-    name_plural = "Размеры и Склад"
-    icon = "fa-solid fa-boxes-stacked"
-    column_list = [
-        ProductSize.id,
-        ProductSize.product_id,
-        ProductSize.size,
-        ProductSize.stock,
-        ProductSize.sku,
-        ProductSize.measurements_cm,
-    ]
+    name, name_plural, icon = "Размер", "Размеры и склад", "fa-solid fa-boxes-stacked"
+    column_list = [ProductSize.id, ProductSize.product_id, ProductSize.size, ProductSize.stock, ProductSize.sku]
     column_sortable_list = [ProductSize.stock, ProductSize.product_id]
 
 
 class ProductImageAdmin(ModelView, model=ProductImage):
-    """Управление фотографиями товаров."""
-    name = "Фото товара"
-    name_plural = "Фотографии товаров"
-    icon = "fa-solid fa-images"
-    column_list = [
-        ProductImage.id,
-        ProductImage.product_id,
-        ProductImage.position,
-        ProductImage.url,
-    ]
+    name, name_plural, icon = "Фото", "Фотографии", "fa-solid fa-images"
+    column_list = [ProductImage.id, ProductImage.product_id, ProductImage.position, ProductImage.url]
 
 
 class ProductMaterialAdmin(ModelView, model=ProductMaterial):
-    """Управление материалами состава (кашемир, пух яка, верблюжья шерсть, кожа)."""
-    name = "Материал"
-    name_plural = "Материалы состава"
-    icon = "fa-solid fa-layer-group"
-    column_list = [
-        ProductMaterial.id,
-        ProductMaterial.product_id,
-        ProductMaterial.material,
-        ProductMaterial.percent,
-    ]
+    name, name_plural, icon = "Материал", "Материалы", "fa-solid fa-layer-group"
+    column_list = [ProductMaterial.id, ProductMaterial.product_id, ProductMaterial.material, ProductMaterial.percent]
 
 
 class ProductColorLinkAdmin(ModelView, model=ProductColorLink):
-    """Перелинковка цветов одной модели товара."""
-    name = "Связь цвета"
-    name_plural = "Связи цветов (Color Links)"
-    icon = "fa-solid fa-palette"
-    column_list = [
-        ProductColorLink.id,
-        ProductColorLink.product_id,
-        ProductColorLink.sibling_slug,
-    ]
+    name, name_plural, icon = "Связь цвета", "Связи цветов", "fa-solid fa-palette"
+    column_list = [ProductColorLink.id, ProductColorLink.product_id, ProductColorLink.sibling_slug]
 
 
 class PriceHistoryAdmin(ModelView, model=PriceHistory):
-    """История изменения цен из парсера."""
-    name = "Запись цены"
-    name_plural = "История цен"
-    icon = "fa-solid fa-chart-line"
-    column_list = [
-        PriceHistory.id,
-        PriceHistory.product_id,
-        PriceHistory.price,
-        PriceHistory.old_price,
-        PriceHistory.scraped_at,
-    ]
+    name, name_plural, icon = "Цена", "История цен", "fa-solid fa-chart-line"
+    column_list = [PriceHistory.id, PriceHistory.product_id, PriceHistory.price, PriceHistory.old_price, PriceHistory.scraped_at]
+    can_create = can_edit = can_delete = False
 
 
 class CrawlQueueAdmin(ModelView, model=CrawlQueue):
-    """Мониторинг очереди обхода ссылок парсера (`crawl_queue`)."""
-    name = "Ссылка парсера"
-    name_plural = "Очередь парсера (Crawl Queue)"
-    icon = "fa-solid fa-spider"
-    column_list = [
-        CrawlQueue.id,
-        CrawlQueue.url,
-        CrawlQueue.status,
-        CrawlQueue.error,
-        CrawlQueue.updated_at,
-    ]
+    name, name_plural, icon = "Ссылка парсера", "Очередь парсера", "fa-solid fa-spider"
+    column_list = [CrawlQueue.id, CrawlQueue.url, CrawlQueue.status, CrawlQueue.error, CrawlQueue.updated_at]
     column_searchable_list = [CrawlQueue.url, CrawlQueue.status]
 
 
 class OrderAdmin(ModelView, model=Order):
-    """Управление заказами и оплатами по СБП."""
-    name = "Заказ"
-    name_plural = "Заказы покупателей"
-    icon = "fa-solid fa-cart-shopping"
+    name, name_plural, icon = "Заказ", "Заказы", "fa-solid fa-cart-shopping"
     column_list = [
-        Order.id,
-        Order.customer_name,
-        Order.customer_phone,
-        Order.delivery_method,
-        Order.delivery_city,
-        Order.total_amount,
-        Order.status,
-        Order.created_at,
-        Order.paid_at,
-    ]
+        Order.id, Order.customer_name, Order.customer_phone, Order.delivery_method,
+        Order.total_amount, Order.status, Order.created_at, Order.paid_at,
+    ]  # fmt: skip
     column_searchable_list = [Order.customer_name, Order.customer_phone, Order.payment_id]
     column_sortable_list = [Order.id, Order.total_amount, Order.created_at]
+    # Статус и остатки меняет только сервис заказов, иначе ломается резерв на складе
+    can_create = can_edit = can_delete = False
 
 
 class OrderItemAdmin(ModelView, model=OrderItem):
-    """Позиции внутри заказов."""
-    name = "Позиция заказа"
-    name_plural = "Позиции заказов"
-    icon = "fa-solid fa-list-check"
-    column_list = [
-        OrderItem.id,
-        OrderItem.order_id,
-        OrderItem.product_name,
-        OrderItem.color,
-        OrderItem.size,
-        OrderItem.quantity,
-        OrderItem.subtotal,
-    ]
+    name, name_plural, icon = "Позиция заказа", "Позиции заказов", "fa-solid fa-list-check"
+    column_list = [OrderItem.id, OrderItem.order_id, OrderItem.product_name, OrderItem.size, OrderItem.quantity, OrderItem.subtotal]
+    can_create = can_edit = can_delete = False
 
 
 class ProductReviewAdmin(ModelView, model=ProductReview):
-    """Модерация отзывов и ответов магазина."""
-    name = "Отзыв / Комментарий"
-    name_plural = "Отзывы и Комментарии"
-    icon = "fa-solid fa-comments"
+    name, name_plural, icon = "Отзыв", "Отзывы", "fa-solid fa-comments"
     column_list = [
-        ProductReview.id,
-        ProductReview.product_id,
-        ProductReview.user_id,
-        ProductReview.rating,
-        ProductReview.comment_text,
-        ProductReview.is_approved,
-        ProductReview.created_at,
-    ]
+        ProductReview.id, ProductReview.product_id, ProductReview.user_id, ProductReview.rating,
+        ProductReview.comment_text, ProductReview.is_approved, ProductReview.created_at,
+    ]  # fmt: skip
 
 
 class ProductLikeAdmin(ModelView, model=ProductLike):
-    """Просмотр лайков товаров."""
-    name = "Лайк"
-    name_plural = "Лайки (Избранное)"
-    icon = "fa-solid fa-heart"
-    column_list = [
-        ProductLike.id,
-        ProductLike.user_id,
-        ProductLike.product_id,
-        ProductLike.created_at,
-    ]
+    name, name_plural, icon = "Лайк", "Лайки", "fa-solid fa-heart"
+    column_list = [ProductLike.id, ProductLike.user_id, ProductLike.product_id, ProductLike.created_at]
+    can_create = can_edit = False
 
 
 class UserAdmin(ModelView, model=User):
-    """Управление пользователями и администраторами."""
-    name = "Пользователь"
-    name_plural = "Пользователи"
-    icon = "fa-solid fa-users"
-    column_list = [
-        User.id,
-        User.email,
-        User.phone,
-        User.full_name,
-        User.role,
-        User.is_active,
-        User.created_at,
-    ]
+    name, name_plural, icon = "Пользователь", "Пользователи", "fa-solid fa-users"
+    column_list = [User.id, User.email, User.phone, User.full_name, User.role, User.is_active, User.created_at]
     column_searchable_list = [User.email, User.phone, User.full_name]
+    column_details_exclude_list = [User.hashed_password]
+    form_excluded_columns = [User.hashed_password]
+    can_create = False
 
 
 class SourceAdmin(ModelView, model=Source):
-    """Источники парсинга."""
-    name = "Источник"
-    name_plural = "Источники парсера"
-    icon = "fa-solid fa-database"
+    name, name_plural, icon = "Источник", "Источники парсера", "fa-solid fa-database"
     column_list = [Source.id, Source.name, Source.base_url]
 
 
+VIEWS = (
+    ProductAdmin, CategoryAdmin, ProductSizeAdmin, ProductImageAdmin, ProductMaterialAdmin,
+    ProductColorLinkAdmin, PriceHistoryAdmin, OrderAdmin, OrderItemAdmin, ProductReviewAdmin,
+    ProductLikeAdmin, UserAdmin, CrawlQueueAdmin, SourceAdmin,
+)  # fmt: skip
+
+
 def setup_admin(app: FastAPI) -> Admin:
-    """
-    Регистрирует все представления моделей в `sqladmin` и монтирует админку по адресу `/admin`.
-    """
     admin = Admin(
         app=app,
         engine=engine,
-        title="Ulaanbaatar Cashmere — Админ-панель",
+        title="Ulaanbaatar Cashmere, админ-панель",
         base_url="/admin",
+        authentication_backend=AdminAuth(secret_key=settings.SECRET_KEY),
     )
-    admin.add_view(ProductAdmin)
-    admin.add_view(CategoryAdmin)
-    admin.add_view(ProductSizeAdmin)
-    admin.add_view(ProductImageAdmin)
-    admin.add_view(ProductMaterialAdmin)
-    admin.add_view(ProductColorLinkAdmin)
-    admin.add_view(PriceHistoryAdmin)
-    admin.add_view(OrderAdmin)
-    admin.add_view(OrderItemAdmin)
-    admin.add_view(ProductReviewAdmin)
-    admin.add_view(ProductLikeAdmin)
-    admin.add_view(UserAdmin)
-    admin.add_view(CrawlQueueAdmin)
-    admin.add_view(SourceAdmin)
-
-    logger.info("Админ-панель sqladmin успешно инициализирована по адресу /admin")
+    for view in VIEWS:
+        admin.add_view(view)
     return admin
