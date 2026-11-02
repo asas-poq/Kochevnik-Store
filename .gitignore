@@ -9,3 +9,12 @@ __pycache__/
 .venv/
 venv/
 *.db
+# Figma mockups
+frontend/design/
+
+# Postman service files (may contain tokens)
+.postman/
+postman/
+
+# Parser output
+backend/data/

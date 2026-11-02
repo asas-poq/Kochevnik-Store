@@ -1,0 +1,336 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/* Связка переменных с классами Tailwind (bg-brand-ink, font-accent…) */
+/* ------------------------------------------------------------------ */
+@theme inline {
+  /* Шрифты. Сами шрифты подключаются в layout.tsx */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-accent: var(--font-playpen), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-logo: var(--font-antiqua), Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Цвета shadcn-компонентов */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Фирменные цвета магазина: классы bg-brand-sand, text-brand-ink и т. д. */
+  --color-header: var(--header-bg);
+
+  --color-brand-bg: var(--brand-bg);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-section: var(--brand-section);
+  --color-brand-sand: var(--brand-sand);
+  --color-brand-line: var(--brand-line);
+  --color-brand-line-strong: var(--brand-line-strong);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-ink-2: var(--brand-ink-2);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-faint: var(--brand-faint);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-dark: var(--brand-accent-dark);
+  --color-brand-beige: var(--brand-beige);
+  --color-brand-cream: var(--brand-cream);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-red: var(--brand-red);
+  --color-brand-green: var(--brand-green);
+
+  /* Цвета бейджей статусов заказа: bg-status-paid-bg text-status-paid-fg */
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-fg: var(--status-pending-fg);
+  --color-status-paid-bg: var(--status-paid-bg);
+  --color-status-paid-fg: var(--status-paid-fg);
+  --color-status-shipped-bg: var(--status-shipped-bg);
+  --color-status-shipped-fg: var(--status-shipped-fg);
+  --color-status-completed-bg: var(--status-completed-bg);
+  --color-status-completed-fg: var(--status-completed-fg);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
+  --color-status-cancelled-fg: var(--status-cancelled-fg);
+
+  /* Скругления (в макетах 12px и 16px, у кнопок и бейджей — "таблетка") */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.33);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* Тема магазина (тёплая, бежево-коричневая) — взята из макетов        */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Палитра макетов */
+  --brand-bg: #fdf9f4; /* фон страницы */
+  --brand-surface: #fdfbf7; /* карточки, поля */
+  --brand-section: #f7f3ee; /* фон крупных секций */
+  --brand-sand: #f1ede8; /* светлый бежевый: плашки, hover */
+  --brand-line: #e8e0d5; /* тонкие границы */
+  --brand-line-strong: #d6ccb8; /* заметные границы */
+  --brand-ink: #392e21; /* основной тёмно-коричневый текст */
+  --brand-ink-2: #4d453e; /* второй по важности текст */
+  --brand-muted: #6b5e4f; /* приглушённый текст */
+  --brand-subtle: #9c8e7d; /* подписи, плейсхолдеры */
+  --brand-faint: #b8a99a; /* совсем светлые детали */
+  --brand-accent: #7c5730; /* акцент (ссылки, активные элементы) */
+  --brand-accent-dark: #5e452a; /* акцент при наведении */
+  --brand-beige: #cbb09d; /* бежевый для акцентных надписей на тёмном */
+  --brand-cream: #e9e3d9; /* светлый текст на тёмном фоне */
+  --brand-dark: #1a1612; /* тёмная подложка баннера */
+  --brand-red: #eb5050; /* лайк, ошибки */
+  --brand-green: #4a7c59; /* успех, «в наличии» */
+  --header-bg: #fbf9f6; /* фон шапки */
+  color-scheme: light;
+
+  /* Статусы заказа */
+  --status-pending-bg: #f5e9cc;
+  --status-pending-fg: #8a5f12;
+  --status-paid-bg: #dcebdd;
+  --status-paid-fg: #2d6a42;
+  --status-shipped-bg: #dbe6f4;
+  --status-shipped-fg: #2c5688;
+  --status-completed-bg: #392e21;
+  --status-completed-fg: #fdfbf7;
+  --status-cancelled-bg: #f7dcda;
+  --status-cancelled-fg: #b0362f;
+
+  /* Переменные, которые читают shadcn-компоненты */
+  --background: var(--brand-bg);
+  --foreground: var(--brand-ink);
+  --card: var(--brand-surface);
+  --card-foreground: var(--brand-ink);
+  --popover: var(--brand-surface);
+  --popover-foreground: var(--brand-ink);
+  --primary: var(--brand-ink);
+  --primary-foreground: var(--brand-surface);
+  --secondary: var(--brand-sand);
+  --secondary-foreground: var(--brand-ink);
+  --muted: var(--brand-sand);
+  --muted-foreground: var(--brand-muted);
+  --accent: var(--brand-sand);
+  --accent-foreground: var(--brand-ink);
+  --destructive: var(--brand-red);
+  --border: var(--brand-line);
+  --input: var(--brand-line-strong);
+  --ring: var(--brand-accent);
+  --chart-1: #7c5730;
+  --chart-2: #cbb09d;
+  --chart-3: #4a7c59;
+  --chart-4: #9c8e7d;
+  --chart-5: #392e21;
+  --radius: 0.75rem; /* 12px */
+  --sidebar: var(--brand-section);
+  --sidebar-foreground: var(--brand-ink);
+  --sidebar-primary: var(--brand-ink);
+  --sidebar-primary-foreground: var(--brand-surface);
+  --sidebar-accent: var(--brand-sand);
+  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-border: var(--brand-line);
+  --sidebar-ring: var(--brand-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Тёмная тема магазина: те же названия цветов, другие значения.       */
+/* Включается классом .dark на <html> (кнопка «луна» в шапке).         */
+/* ------------------------------------------------------------------ */
+.dark {
+  color-scheme: dark;
+  --brand-bg: #0b0a09;
+  --brand-surface: #141211;
+  --brand-section: #181614;
+  --brand-sand: #211e1b;
+  --brand-line: #2f2b26;
+  --brand-line-strong: #433d36;
+  --brand-ink: #f4efe8;
+  --brand-ink-2: #ddd5ca;
+  --brand-muted: #b3a999;
+  --brand-subtle: #8a8073;
+  --brand-faint: #6f665a;
+  --brand-accent: #d4a977;
+  --brand-accent-dark: #e4bf91;
+  --brand-beige: #cbb09d;
+  --brand-cream: #e9e3d9;
+  --brand-dark: #000000;
+  --brand-red: #f27272;
+  --brand-green: #6fb184;
+  --header-bg: #0b0a09;
+
+  --status-pending-bg: #3d3217;
+  --status-pending-fg: #f0c869;
+  --status-paid-bg: #1f3a28;
+  --status-paid-fg: #8fd0a3;
+  --status-shipped-bg: #1d3350;
+  --status-shipped-fg: #9cc3f0;
+  --status-completed-bg: #e9e3d9;
+  --status-completed-fg: #141211;
+  --status-cancelled-bg: #4a2220;
+  --status-cancelled-fg: #f0a09a;
+}
+
+/* ------------------------------------------------------------------ */
+/* Тема админки: холодная серо-синяя. Включается классом .admin-theme  */
+/* на корневом элементе админ-раздела (сделаем в шаге 8).              */
+/* ------------------------------------------------------------------ */
+.admin-theme {
+  --background: #f3f5f9;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+  --primary: #3b5b87;
+  --primary-foreground: #ffffff;
+  --secondary: #e8edf4;
+  --secondary-foreground: #1e293b;
+  --muted: #edf1f6;
+  --muted-foreground: #64748b;
+  --accent: #e3eaf3;
+  --accent-foreground: #1e293b;
+  --destructive: #dc2626;
+  --border: #dce3ec;
+  --input: #cbd5e1;
+  --ring: #3b5b87;
+  --sidebar: #1b2638;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #5b83b8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #26344a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2b3a52;
+  --sidebar-ring: #5b83b8;
+}
+
+/* Админка в тёмном режиме */
+.admin-theme.dark {
+  --background: #0f1623;
+  --foreground: #e2e8f0;
+  --card: #162032;
+  --card-foreground: #e2e8f0;
+  --popover: #162032;
+  --popover-foreground: #e2e8f0;
+  --primary: #6b93c9;
+  --primary-foreground: #0b1220;
+  --secondary: #1e2b42;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1b2740;
+  --muted-foreground: #94a3b8;
+  --accent: #223250;
+  --accent-foreground: #e2e8f0;
+  --destructive: #ef4444;
+  --border: #26344c;
+  --input: #31425e;
+  --ring: #6b93c9;
+  --sidebar: #0b1220;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #6b93c9;
+  --sidebar-primary-foreground: #0b1220;
+  --sidebar-accent: #1b2740;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1f2c44;
+  --sidebar-ring: #6b93c9;
+}
+
+/* ------------------------------------------------------------------ */
+/* Базовые стили и маленькие помощники                                 */
+/* ------------------------------------------------------------------ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-padding-top: 5rem;
+  }
+  /* Страница не должна «ездить» вбок на телефоне */
+  body {
+    overflow-x: clip;
+  }
+  /* Нажатия без задержки и без серой вспышки на iPhone */
+  a,
+  button,
+  summary,
+  label,
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Убираем «встроенный» вид полей на iPhone (внутренние тени и скругления) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+  textarea {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+/* Контейнер страницы: макс. ширина 1280px, отступы 16px (на телефоне) и 32px (шире) */
+@utility container-page {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  /* max(..., safe-area): на iPhone в горизонтальном положении текст не уходит под «чёлку» */
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  @media (min-width: 40rem) {
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+  }
+}
+
+/* Скрыть полосу прокрутки у горизонтальных каруселей */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* На телефонах и планшетах поля ввода должны быть 16px, иначе iPhone
+   сам увеличивает страницу при нажатии на поле. (Правило вне @layer, поэтому оно главнее.) */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
