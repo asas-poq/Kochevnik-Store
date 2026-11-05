@@ -1,6 +1,6 @@
 FROM python:3.11-slim AS builder
 WORKDIR /build
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.11-slim
@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=builder /install /usr/local
-COPY --chown=app:app . .
+COPY --chown=app:app backend/ .
 RUN mkdir -p media logs data/parser && chown -R app:app media logs data/parser
 USER app
 EXPOSE 8000
