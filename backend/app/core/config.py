@@ -3,8 +3,12 @@ from functools import lru_cache
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-INSECURE_VALUES = {"super_secret_cashmere_jwt_key_change_in_production_2026", "change-me"}
-
+INSECURE_VALUES = {
+    "super_secret_cashmere_jwt_key_change_in_production_2026",
+    "change-me",
+    "replace-me",
+    "replace-with-random-string-of-32-plus-chars",
+}
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -22,7 +26,7 @@ class Settings(BaseSettings):
     ]
 
     POSTGRES_USER: str = "ubcashmere"
-    POSTGRES_PASSWORD: str = "ubcashmere_secret"
+    POSTGRES_PASSWORD: str = "asa"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "ubcashmere_db"

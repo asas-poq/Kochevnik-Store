@@ -11,7 +11,9 @@ x-backend: &backend
     LOG_FILE: ""
     LOG_JSON: "true"
     WEB_CONCURRENCY: "2"
-  restart: unles-stopped
+    # api доступен только из сети compose, поэтому доверяем заголовкам nginx
+    FORWARDED_ALLOW_IPS: "*"
+  restart: unless-stopped
 
 services:
   # ---------- Единая точка входа: http://localhost (через Nginx) ----------
@@ -45,7 +47,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ubcashmere}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ubcashmere_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asa}
       POSTGRES_DB: ${POSTGRES_DB:-ubcashmere_db}
     ports:
       - "127.0.0.1:5432:5432"
@@ -181,6 +183,7 @@ configs:
         location = /health { proxy_pass http://api; }
         location /docs    { proxy_pass http://api; }
         location /openapi.json { proxy_pass http://api; }
+        location /sqladmin { proxy_pass http://api; }
 
         # Фронтенд (всё остальное)
         location / {

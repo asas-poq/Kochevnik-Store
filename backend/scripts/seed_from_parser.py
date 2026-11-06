@@ -14,13 +14,18 @@ from app.services.seed import import_parser_dump, seed_demo_users
 DUMP = Path(__file__).resolve().parent.parent / "data" / "parsed_dump.json"
 
 
+
+
 async def main() -> None:
     setup_logging()
     logger = get_logger("seed")
     if settings.is_production:
         sys.exit("Сид с демо-паролями в production не запускается.")
-    logger.info("Импорт дампа", extra={"file": str(DUMP)})
-    await import_parser_dump(DUMP)
+    if DUMP.exists():
+        logger.info("Импорт дампа", extra={"file": str(DUMP)})
+        await import_parser_dump(DUMP)
+    else:
+        logger.warning("Файла %s нет, товары не импортируются. Наполни каталог парсером.", DUMP)
     await seed_demo_users()
     logger.info("Админ admin@ubcashmere.ru / Admin123!, покупатель anna@example.com / Customer123!")
     await engine.dispose()

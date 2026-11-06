@@ -160,7 +160,7 @@ def setup_admin(app: FastAPI) -> Admin:
         app=app,
         engine=engine,
         title="Ulaanbaatar Cashmere, админ-панель",
-        base_url="/admin",
+        base_url="/sqladmin",
         authentication_backend=AdminAuth(secret_key=settings.SECRET_KEY),
     )
     for view in VIEWS:

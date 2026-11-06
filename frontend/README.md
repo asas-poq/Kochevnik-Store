@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kochevnik Store, фронтенд
 
-## Getting Started
+Витрина, личный кабинет и админка интернет-магазина. Next.js 16 с App Router, React 19, TypeScript и Tailwind 4. Компоненты на shadcn/ui, состояние в zustand, запросы через TanStack Query и axios, формы на react-hook-form с zod.
 
-First, run the development server:
+Без запущенного бэкенда в каталоге будет пусто, поэтому сначала поднимите API. Как это сделать, написано в корневом README.
 
-```bash
+## Запуск
+
+Нужен Node.js 22, в Docker используется он же.
+
+```
+cd frontend
+cp .env.example .env.local
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Сайт откроется на http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Если бэкенд запущен через Docker Compose из корня, его API доступно через nginx на порту 80. Тогда в `.env.local` поставь `NEXT_PUBLIC_API_URL=http://localhost`. Если бэкенд запущен вручную на порту 8000, оставь значение из `.env.example`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Переменная | Зачем |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Адрес бэкенда без `/api/v1`, путь клиент добавляет сам |
+| `NEXT_PUBLIC_SITE_URL` | Адрес самого сайта, нужен для метаданных страниц |
 
-## Learn More
+Обе переменные попадают в код при сборке. После правки перезапусти `npm run dev` или пересобери Docker-образ.
 
-To learn more about Next.js, take a look at the following resources:
+## Команды
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+npm run dev      разработка с горячей перезагрузкой
+npm run build    боевая сборка
+npm run start    запуск собранного приложения
+npm run lint     проверка ESLint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Структура
 
-## Deploy on Vercel
+```
+src/
+  app/          страницы: каталог, товар, корзина, оформление, заказ, профиль, вход, админка
+  components/   компоненты по разделам, базовые лежат в ui/ (shadcn)
+  hooks/        запросы к API через React Query
+  stores/       auth-store (сессия) и cart-store (корзина)
+  lib/          api.ts (клиент), константы, форматирование, ключи запросов
+  types/        типы API, описаны по openapi.json
+public/images/home/   фото для главной: hero.jpg и плитки tile-*.jpg
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Что стоит знать
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ошибки бэкенда приходят в виде `{detail, code}`. Клиент в `lib/api.ts` превращает их в `ApiError`, а пользователю они показываются уведомлением sonner.
+
+Сессия хранится в zustand и сохраняется в localStorage. Если запрос получил 401, клиент один раз обновляет токен через `/auth/refresh` и повторяет запрос. Если обновить не вышло, пользователя разлогинивает. Несколько запросов, упавших одновременно, ждут один общий refresh.
+
+Корзина локальная, тоже в zustand. В API её нет, на бэкенд уходит уже готовый заказ.
+
+Страницы `/admin/*` открываются только пользователю с ролью admin. Раздел админки выглядит по-другому, чем витрина: холодная серо-синяя палитра, боковое меню, таблицы.
+
+Тёмная тема переключается через next-themes. Вёрстка сначала под телефон, потом под десктоп. Цены выводятся как `12 500 ₽`.
+
+Если на главной нет фото в `public/images/home/`, вместо картинки показывается тёмный фон, и сайт не ломается.
+
+Если API поменялся, нужно обновить `openapi.json` и типы в `src/types/api.d.ts`.
