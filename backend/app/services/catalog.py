@@ -1,7 +1,7 @@
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,7 +74,7 @@ SEASON_RULES: dict[str, SeasonRule] = {
 
 
 def current_season(now: datetime | None = None) -> SeasonRule:
-    month = (now or datetime.now(timezone.utc)).month
+    month = (now or datetime.now(UTC)).month
     return next(rule for rule in SEASON_RULES.values() if month in rule.months)
 
 
@@ -93,7 +93,7 @@ def seasonal_condition(rule: SeasonRule) -> ColumnElement[bool]:
 
 
 def popularity_expr():  # type: ignore[no-untyped-def]
-    since = datetime.now(timezone.utc) - timedelta(days=settings.POPULARITY_WINDOW_DAYS)
+    since = datetime.now(UTC) - timedelta(days=settings.POPULARITY_WINDOW_DAYS)
     sold = (
         select(func.coalesce(func.sum(OrderItem.quantity), 0))
         .select_from(OrderItem)

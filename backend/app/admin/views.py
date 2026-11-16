@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
+from sqlalchemy import select
 from starlette.requests import Request
 
 from app.core.config import settings
@@ -22,7 +23,6 @@ from app.models import (
     Source,
     User,
 )
-from sqlalchemy import select
 
 
 class AdminAuth(AuthenticationBackend):

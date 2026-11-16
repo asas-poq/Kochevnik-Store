@@ -1,11 +1,11 @@
 import os
 
-from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine
 
+from alembic import command
 from app.db.base import Base
 
 

@@ -6,13 +6,13 @@ from sqlalchemy import func, select
 from app.api.deps import DBSessionDep, get_current_admin
 from app.core.config import settings
 from app.core.errors import BadRequestError, NotFoundError
+from app.core.queue import ArqDep
 from app.core.ratelimit import rate_limit
 from app.core.redis import RedisDep
 from app.models import CrawlQueue
 from app.schemas.catalog import CrawlQueueItemOut
 from app.schemas.common import ErrorOut
 from app.services.parser import jobs, state
-from app.core.queue import ArqDep
 
 router = APIRouter(
     prefix="/parser",

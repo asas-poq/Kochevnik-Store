@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -26,7 +26,7 @@ from app.services.catalog import card_loader_options
 logger = get_logger(__name__)
 
 
-class ReviewSort(str, Enum):
+class ReviewSort(StrEnum):
     newest = "newest"
     oldest = "oldest"
     rating_desc = "rating_desc"

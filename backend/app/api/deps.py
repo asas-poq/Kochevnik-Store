@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import Depends, Query, Request
@@ -34,7 +34,7 @@ async def get_optional_user(
         select(UserSession.id).where(
             UserSession.jti == sid,
             UserSession.revoked_at.is_(None),
-            UserSession.expires_at > datetime.now(timezone.utc),
+            UserSession.expires_at > datetime.now(UTC),
         )
     )
     if alive.scalar_one_or_none() is None:

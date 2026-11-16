@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -210,7 +210,7 @@ async def apply_payment_result(
             return "amount_mismatch"
         ensure_transition(order, S.PAID.value)
         order.status = S.PAID.value
-        order.paid_at = datetime.now(timezone.utc)
+        order.paid_at = datetime.now(UTC)
         return "paid"
 
     if order.status == S.CANCELLED.value:
@@ -266,7 +266,7 @@ async def list_orders(
 
 
 async def cancel_expired_pending_orders(session_factory: async_sessionmaker[AsyncSession]) -> int:
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=settings.ORDER_PAYMENT_TTL_MINUTES)
+    cutoff = datetime.now(UTC) - timedelta(minutes=settings.ORDER_PAYMENT_TTL_MINUTES)
     cancelled = 0
     async with session_factory() as db:
         ids = (
