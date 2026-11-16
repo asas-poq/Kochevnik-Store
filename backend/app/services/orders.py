@@ -148,7 +148,7 @@ async def create_order(
         payment_id, payment_url = await gateway.create_sbp_payment(
             order_id=order_id,
             total_amount=total,
-            description=f"Заказ #{order_id} в бутике Ulaanbaatar Cashmere",
+            description=f"Заказ #{order_id} в магазине Kochevnik Store",
             customer_phone=payload.customer_phone,
         )
     except PaymentGatewayError:

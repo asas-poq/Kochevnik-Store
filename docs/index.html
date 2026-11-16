@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kochevnik Store: backend-проект</title>
+  <meta name="description" content="Интернет-магазин: FastAPI, PostgreSQL, Redis, Docker. Backend-портфолио.">
+  <style>
+    :root { --bg:#faf8f5; --card:#fff; --text:#1f1b16; --muted:#6b645a; --line:#e6dfd5; --accent:#7a4e2d; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#16130f; --card:#1f1b16; --text:#f2ece3; --muted:#a39a8d; --line:#332d25; --accent:#d4a574; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .wrap { max-width:1040px; margin:0 auto; padding:0 20px; }
+    header { padding:72px 0 40px; }
+    h1 { font-size:clamp(2rem,5vw,3.2rem); line-height:1.1; margin:0 0 14px; font-family:Georgia, "Times New Roman", serif; font-weight:600; }
+    h2 { font-size:1.5rem; margin:56px 0 18px; font-family:Georgia, serif; }
+    p.lead { font-size:1.15rem; color:var(--muted); max-width:720px; margin:0 0 24px; }
+    .btns { display:flex; flex-wrap:wrap; gap:10px; }
+    .btn { display:inline-block; padding:10px 18px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); text-decoration:none; font-weight:500; }
+    .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+    .chip { font-size:.85rem; padding:4px 12px; border-radius:99px; background:var(--card); border:1px solid var(--line); color:var(--muted); }
+    .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+    .card h3 { margin:0 0 8px; font-size:1.05rem; }
+    .card p { margin:0; color:var(--muted); font-size:.95rem; }
+    .arch { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; overflow-x:auto; }
+    .arch img { width:100%; min-width:640px; display:block; }
+    .shots { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+    figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    figure img { width:100%; display:block; }
+    figcaption { padding:10px 14px; font-size:.9rem; color:var(--muted); }
+    footer { padding:56px 0 64px; color:var(--muted); font-size:.9rem; }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Kochevnik Store</h1>
+    <p class="lead">Интернет-магазин кашемира и кожи. Я backend-разработчик, и это моё backend-портфолио: API, резервирование остатков, оплата через СБП, воркер, мониторинг. Весь стек поднимается одной командой Docker Compose.</p>
+    <div class="btns">
+      <a class="btn primary" href="api/">Документация API (Swagger)</a>
+      <a class="btn" href="https://github.com/asas-poq/Kochevnik-Store">Код на GitHub</a>
+    </div>
+    <div class="chips">
+      <span class="chip">Python 3.11</span><span class="chip">FastAPI</span><span class="chip">SQLAlchemy 2.0 async</span>
+      <span class="chip">PostgreSQL 16</span><span class="chip">Redis 7</span><span class="chip">ARQ</span>
+      <span class="chip">Docker Compose</span><span class="chip">nginx</span><span class="chip">Prometheus</span>
+      <span class="chip">Grafana</span><span class="chip">GitHub Actions</span>
+    </div>
+  </header>
+
+  <h2>Архитектура</h2>
+  <div class="arch"><img src="architecture.svg" alt="Схема архитектуры"></div>
+
+  <h2>Ключевые решения</h2>
+  <div class="grid">
+    <div class="card"><h3>Резервирование остатков</h3><p>Остаток списывается при создании заказа под блокировкой строк (<code>SELECT … FOR UPDATE</code>) в фиксированном порядке, без взаимных блокировок.</p></div>
+    <div class="card"><h3>Автоотмена заказов</h3><p>Воркер отменяет неоплаченный заказ через 30 минут и возвращает остаток на склад.</p></div>
+    <div class="card"><h3>Идемпотентные вебхуки</h3><p>События оплаты записываются в журнал, повторная доставка ничего не меняет, статус и сумма проверяются у ЮKassa.</p></div>
+    <div class="card"><h3>Машина статусов</h3><p>Допустимые переходы заказа заданы таблицей, гонки и повторы не откатывают статус.</p></div>
+    <div class="card"><h3>Безопасность</h3><p>Access и refresh токены с сессиями, лимиты запросов через Redis, чужой заказ отдаёт 404, production-режим не стартует со слабыми секретами.</p></div>
+    <div class="card"><h3>Наблюдаемость</h3><p>Метрики Prometheus, дашборд Grafana, структурированные логи, <code>/health</code> с проверкой зависимостей.</p></div>
+  </div>
+
+  <h2>Как это выглядит</h2>
+  <div class="shots">
+    <figure><img src="screenshots/01-home.png" alt="" onerror="this.parentElement.remove()"><figcaption>Главная</figcaption></figure>
+    <figure><img src="screenshots/02-catalog.png" alt="" onerror="this.parentElement.remove()"><figcaption>Каталог</figcaption></figure>
+    <figure><img src="screenshots/02-catalog.png" alt="" onerror="this.parentElement.remove()"><figcaption>Карточка товара</figcaption></figure>
+    <figure><img src="screenshots/04-cart.png" alt="" onerror="this.parentElement.remove()"><figcaption>Корзина</figcaption></figure>
+    <figure><img src="screenshots/05-checkout.png" alt="" onerror="this.parentElement.remove()"><figcaption>Оформление заказа</figcaption></figure>
+    <figure><img src="screenshots/07-admin-orders.png" alt="" onerror="this.parentElement.remove()"><figcaption>Заказы в админке</figcaption></figure>
+    <figure><img src="screenshots/08-telegram.png" alt="" onerror="this.parentElement.remove()"><figcaption>Уведомления в Telegram</figcaption></figure>
+  </div>
+
+  <h2>Бэкенд и инфраструктура</h2>
+  <div class="shots">
+    <figure><img src="screenshots/09-swagger.png" alt="" onerror="this.parentElement.remove()"><figcaption>Swagger, <code>/docs</code></figcaption></figure>
+    <figure><img src="screenshots/10-sqladmin.png" alt="" onerror="this.parentElement.remove()"><figcaption>SQLAdmin</figcaption></figure>
+    <figure><img src="screenshots/11-docker-ps.png" alt="" onerror="this.parentElement.remove()"><figcaption>Контейнеры</figcaption></figure>
+    <figure><img src="screenshots/12-grafana.png" alt="" onerror="this.parentElement.remove()"><figcaption>Grafana</figcaption></figure>
+    <figure><img src="screenshots/13-pytest.png" alt="" onerror="this.parentElement.remove()"><figcaption>Тесты и линтер</figcaption></figure>
+  </div>
+
+  <footer>Фронтенд сгенерирован с помощью ИИ по моим макетам Figma, всё остальное написано мной. <a href="https://github.com/asas-poq/Kochevnik-Store">Исходный код</a>.</footer>
+</div>
+<script>
+  window.addEventListener("load", function () {
+    document.querySelectorAll(".shots").forEach(function (g) {
+      if (!g.querySelector("figure")) { g.previousElementSibling.remove(); g.remove(); }
+    });
+  });
+</script>
+</body>
+</html>

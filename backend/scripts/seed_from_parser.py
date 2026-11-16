@@ -1,19 +1,18 @@
-"""Заливает data/parsed_dump.json и демо-пользователей. Таблицы должны уже быть: make migrate.
+"""Наполняет базу: создаёт демо-пользователей и загружает 50 товаров парсером.
 
-Запуск из корня проекта: python -m scripts.seed_from_parser
+Таблицы должны уже существовать: make migrate.
+Запуск из каталога backend: python -m scripts.seed_from_parser
 """
 import asyncio
 import sys
-from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.db.session import engine
-from app.services.seed import import_parser_dump, seed_demo_users
+from app.services.parser import jobs
+from app.services.seed import seed_demo_users
 
-DUMP = Path(__file__).resolve().parent.parent / "data" / "parsed_dump.json"
-
-
+PRODUCTS_LIMIT = 50
 
 
 async def main() -> None:
@@ -21,14 +20,17 @@ async def main() -> None:
     logger = get_logger("seed")
     if settings.is_production:
         sys.exit("Сид с демо-паролями в production не запускается.")
-    if DUMP.exists():
-        logger.info("Импорт дампа", extra={"file": str(DUMP)})
-        await import_parser_dump(DUMP)
-    else:
-        logger.warning("Файла %s нет, товары не импортируются. Наполни каталог парсером.", DUMP)
+
     await seed_demo_users()
-    logger.info("Админ admin@ubcashmere.ru / Admin123!, покупатель anna@example.com / Customer123!")
+    logger.info("Пользователи: admin@example.com / Admin123!, anna@example.com / Customer123!")
+
+    discovered = await jobs.run_named("discover", {})
+    logger.info("Найдено ссылок на товары", extra={"result": discovered})
+    scraped = await jobs.run_named("scrape", {"limit": PRODUCTS_LIMIT})
+    logger.info("Товары загружены", extra={"result": scraped})
     await engine.dispose()
+    if not scraped.get("ok"):
+        sys.exit("Парсер не загрузил ни одного товара: проверьте доступность источника.")
 
 
 if __name__ == "__main__":

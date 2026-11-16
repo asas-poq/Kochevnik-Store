@@ -159,7 +159,7 @@ def setup_admin(app: FastAPI) -> Admin:
     admin = Admin(
         app=app,
         engine=engine,
-        title="Ulaanbaatar Cashmere, админ-панель",
+        title="Kochevnik Store, админ-панель",
         base_url="/sqladmin",
         authentication_backend=AdminAuth(secret_key=settings.SECRET_KEY),
     )

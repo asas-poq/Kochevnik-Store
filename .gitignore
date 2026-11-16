@@ -1,6 +1,5 @@
 # JetBrains IDE
 .idea/
-
 *.iml
 .vscode/
 __pycache__/
@@ -9,6 +8,7 @@ __pycache__/
 .venv/
 venv/
 *.db
+
 # Figma mockups
 frontend/design/
 
@@ -18,3 +18,6 @@ postman/
 
 # Parser output
 backend/data/
+
+.DS_Store
+node_modules/

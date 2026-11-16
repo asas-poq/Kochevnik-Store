@@ -59,7 +59,7 @@ class Product(Base):
     url: Mapped[str | None] = mapped_column(String(500))
     article: Mapped[str | None] = mapped_column(String(64), index=True)
     name: Mapped[str] = mapped_column(String(300), index=True)
-    brand: Mapped[str | None] = mapped_column(String(120), default="Ulaanbaatar")
+    brand: Mapped[str | None] = mapped_column(String(120), default="Kochevnik")
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), index=True
     )
@@ -103,7 +103,7 @@ class Product(Base):
     likes: Mapped[list["ProductLike"]] = relationship(cascade="all, delete-orphan")
 
     def sku_for(self, size: str) -> str:
-        return f"UB-{self.article or self.id}-{size.replace(' ', '')}"
+        return f"KV-{self.article or self.id}-{size.replace(' ', '')}"
 
 
 class PriceHistory(Base):

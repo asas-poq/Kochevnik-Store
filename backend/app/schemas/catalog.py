@@ -89,7 +89,7 @@ class ProductCardOut(BaseModel):
     slug: str
     article: str | None = None
     name: str
-    brand: str | None = "Ulaanbaatar"
+    brand: str | None = "Kochevnik"
     category_id: int | None = None
     color: str | None = None
     color_hex: str | None = "#D8CFC4"
@@ -218,7 +218,7 @@ class ProductCreateIn(BaseModel):
     slug: str = Field(max_length=255)
     name: str = Field(min_length=2, max_length=300)
     article: str | None = Field(None, max_length=64)
-    brand: str = Field("Ulaanbaatar", max_length=120)
+    brand: str = Field("Kochevnik", max_length=120)
     category_id: int | None = None
     color: str | None = Field(None, max_length=80)
     color_hex: str | None = Field(None, description="По умолчанию берётся из справочника по названию цвета")

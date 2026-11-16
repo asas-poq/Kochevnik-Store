@@ -15,18 +15,17 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
     )
 
-    PROJECT_NAME: str = "Ulaanbaatar Cashmere & Leather API"
+    PROJECT_NAME: str = "Kochevnik Store API"
     VERSION: str = "2.0.0"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
-        "https://ubcashmere.ru",
     ]
 
-    POSTGRES_USER: str = "ubcashmere"
-    POSTGRES_PASSWORD: str = "asa"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "asas"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "ubcashmere_db"
@@ -48,7 +47,7 @@ class Settings(BaseSettings):
     RATE_WEBHOOK_PER_MIN: int = 120
 
     S3_ENDPOINT_URL: str = "http://localhost:9000"
-    S3_PUBLIC_BASE_URL: str = "https://cdn.ubcashmere.ru"
+    S3_PUBLIC_BASE_URL: str = "https://cdn.example.com"
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin123"
     S3_BUCKET_NAME: str = "ubcashmere-media"
@@ -61,7 +60,7 @@ class Settings(BaseSettings):
     YOOKASSA_SHOP_ID: str = "test_shop_id"
     YOOKASSA_SECRET_KEY: str = "test_secret_key"
     PAYMENT_WEBHOOK_SECRET: str = "change-me"
-    PAYMENT_RETURN_URL: str = "https://ubcashmere.ru/checkout/success"
+    PAYMENT_RETURN_URL: str = "http://localhost/checkout/success"
     PUBLIC_BASE_URL: str = "http://localhost:8000"
     ORDER_PAYMENT_TTL_MINUTES: int = 30
     FREE_DELIVERY_THRESHOLD_RUB: int = 15000
@@ -86,7 +85,7 @@ class Settings(BaseSettings):
     PARSER_DELAY_SECONDS: float = 1.5
     PARSER_HTTP_TIMEOUT: float = 30
     PARSER_RETRIES: int = 3
-    PARSER_USER_AGENT: str = "Mozilla/5.0 (compatible; PriceResearchBot/1.0; +contact: replace-with-your-email)"
+    PARSER_USER_AGENT: str = "Mozilla/5.0 (compatible; KochevnikStoreBot/1.0; +https://github.com/asas-poq/Kochevnik-Store)"
     PARSER_DATA_DIR: str = "data/parser"
     PARSER_LOCK_TTL_SECONDS: int = 4 * 3600
     PARSER_DEFAULT_STOCK: int = 5

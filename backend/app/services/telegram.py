@@ -319,7 +319,7 @@ class TelegramService:
                 if role == "owner":
                     chats[role] = {"chat_id": None, "ok": False, "detail": "TELEGRAM_OWNER_CHAT_ID не задан"}
                 continue
-            ok, result = await self._send(chat_id, "Тест уведомлений Ulaanbaatar Cashmere: Telegram подключён.")
+            ok, result = await self._send(chat_id, "Тест уведомлений Kochevnik Store: Telegram подключён.")
             chats[role] = {"chat_id": chat_id, "ok": ok, "detail": "ok" if ok else str(result)}
         return {
             "mode": "live",

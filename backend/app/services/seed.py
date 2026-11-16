@@ -87,7 +87,7 @@ async def import_parser_dump(
             raw = row.get("raw_json") or {}
             price_row = last_price.get(row["id"], {})
             price = price_row.get("price") or raw.get("price")
-            brand = row.get("brand", "Ulaanbaatar")
+            brand = row.get("brand", "Kochevnik")
             db.add(
                 Product(
                     id=row["id"], source_id=row.get("source_id", 1), slug=row["slug"], url=row.get("url"),
@@ -97,7 +97,7 @@ async def import_parser_dump(
                     composition=row.get("composition"), density_yarn=DEFAULT_YARN,
                     care_text=row.get("care_text") or DEFAULT_CARE, measurements=row.get("measurements"),
                     description=row.get("description")
-                    or f"Изделие «{row['name']}» от монгольского бренда {brand}. "
+                    or f"Изделие «{row['name']}» от бренда {brand}. "
                     f"Состав: {row.get('composition') or '100% кашемир'}.",
                     current_price=price or 0,
                     old_price=price_row.get("old_price") or raw.get("old_price"),
@@ -193,13 +193,13 @@ async def import_parser_dump(
 async def seed_demo_users(session_factory: async_sessionmaker[AsyncSession] = AsyncSessionLocal) -> None:
     """Администратор, покупатель и пара лайков и отзывов, чтобы ручки можно было пройти в Swagger."""
     async with session_factory() as db:
-        admin = (await db.execute(select(User).where(User.email == "admin@ubcashmere.ru"))).scalar_one_or_none()
+        admin = (await db.execute(select(User).where(User.email == "admin@example.com"))).scalar_one_or_none()
         if not admin:
             db.add(
                 User(
-                    email="admin@ubcashmere.ru", phone="+79990000001", full_name="Администратор Ulaanbaatar",
+                    email="admin@example.com", phone="+79990000001", full_name="Администратор Kochevnik",
                     hashed_password=get_password_hash("Admin123!"), role="admin", default_city="Москва",
-                    default_delivery_address="Шоурум Ulaanbaatar, Москва",
+                    default_delivery_address="Шоурум Kochevnik, Москва",
                 )
             )
         customer = (await db.execute(select(User).where(User.email == "anna@example.com"))).scalar_one_or_none()

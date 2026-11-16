@@ -5,7 +5,7 @@ x-backend: &backend
     dockerfile: backend/Dockerfile
   env_file: ./backend/.env
   environment:
-    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ubcashmere}:${POSTGRES_PASSWORD:-ubcashmere_secret}@postgres:5432/${POSTGRES_DB:-ubcashmere_db}
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-asas}@postgres:5432/${POSTGRES_DB:-ubcashmere_db}
     REDIS_URL: redis://redis:6379/0
     PUBLIC_BASE_URL: ${SITE_URL:-http://localhost}
     LOG_FILE: ""
@@ -36,7 +36,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${SITE_URL:-http://localhost}
+        NEXT_PUBLIC_API_URL: ""
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost}
     expose:
       - "3000"
@@ -46,8 +46,8 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-ubcashmere}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asa}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asas}
       POSTGRES_DB: ${POSTGRES_DB:-ubcashmere_db}
     ports:
       - "127.0.0.1:5432:5432"

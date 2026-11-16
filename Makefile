@@ -15,9 +15,9 @@ parser:
 	docker compose run --rm worker python -m app.services.parser $(ARGS)
 
 test:
-	pytest -q
+	cd backend && pytest -q
 
 lint:
-	ruff check . && ruff format --check .
+	cd backend && ruff check . && ruff format --check .
 
 .PHONY: up down migrate seed parser test lint
