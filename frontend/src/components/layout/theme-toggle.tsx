@@ -1,17 +1,29 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 
 type Mode = "system" | "light" | "dark";
-const NAMES: Record<Mode, string> = { system: "Авто", light: "Светлая", dark: "Тёмная" };
-const NEXT: Record<Mode, Mode> = { system: "light", light: "dark", dark: "system" };
 
-// Переключатель темы: Авто (как в телефоне) → Светлая → Тёмная → Авто.
-// Выбор запоминается в браузере.
-// variant="icon": круглая иконка в шапке; "row": строка в мобильном меню; "admin": кнопка в админке.
+const NAMES: Record<Mode, string> = {
+  system: "Авто",
+  light: "Светлая",
+  dark: "Тёмная",
+};
+
+const NEXT: Record<Mode, Mode> = {
+  system: "light",
+  light: "dark",
+  dark: "system",
+};
+
+const subscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function ThemeToggle({
   variant = "icon",
   className,
@@ -20,14 +32,21 @@ export function ThemeToggle({
   className?: string;
 }) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
-  // До загрузки страницы режим неизвестен, показываем «Авто»
-  const mode: Mode = mounted && (theme === "light" || theme === "dark") ? theme : "system";
-  const Icon = mode === "dark" ? Moon : mode === "light" ? Sun : Monitor;
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+
+  const mode: Mode =
+    mounted && (theme === "light" || theme === "dark")
+      ? theme
+      : "system";
+
+  const Icon =
+    mode === "dark" ? Moon : mode === "light" ? Sun : Monitor;
+
   const label = `Тема: ${NAMES[mode]}. Нажмите, чтобы переключить`;
   const toggle = () => setTheme(NEXT[mode]);
 

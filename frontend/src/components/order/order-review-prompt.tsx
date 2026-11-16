@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, MessageSquare, Send } from "lucide-react";
 import { ReviewForm } from "@/components/product/reviews-section";
 import {
@@ -16,8 +17,11 @@ import { SUPPORT_TELEGRAM } from "@/lib/constants";
 import { btnOutline, btnPrimary } from "@/lib/styles";
 import type { Schema } from "@/types";
 
-// После оплаты просим оставить отзыв о товарах или написать в поддержку
 const PAID_STATUSES = ["paid", "shipped", "completed"];
+
+const subscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 function SupportLink({ className }: { className?: string }) {
   return (
@@ -36,40 +40,63 @@ function SupportLink({ className }: { className?: string }) {
 export function OrderReviewPrompt({ order }: { order: Schema<"OrderOut"> }) {
   const reviewable = PAID_STATUSES.includes(order.status);
   const myReviews = useMyReviews({ limit: 100 });
+
   const [formFor, setFormFor] = useState<number | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const reviewedIds = useMemo(
     () => new Set((myReviews.data ?? []).map((r) => r.product_id)),
     [myReviews.data],
   );
 
-  // Уникальные товары заказа (один товар в разных размерах считаем один раз)
   const products = useMemo(() => {
     const map = new Map<number, { product_id: number; name: string }>();
+
     for (const item of order.items ?? []) {
       if (!map.has(item.product_id)) {
-        map.set(item.product_id, { product_id: item.product_id, name: item.product_name });
+        map.set(item.product_id, {
+          product_id: item.product_id,
+          name: item.product_name,
+        });
       }
     }
+
     return [...map.values()];
   }, [order.items]);
 
-  const pendingCount = products.filter((p) => !reviewedIds.has(p.product_id)).length;
+  const pendingCount = products.filter(
+    (p) => !reviewedIds.has(p.product_id),
+  ).length;
+
   const storageKey = `kochevnik-review-prompt-${order.id}`;
 
-  // Один раз для каждого заказа показываем окно с просьбой об отзыве
-  useEffect(() => {
-    if (!reviewable || myReviews.isLoading || pendingCount === 0) return;
+  const hasSeenPrompt = (() => {
+    if (!mounted) return false;
+
     try {
-      if (!localStorage.getItem(storageKey)) setDialogOpen(true);
+      return localStorage.getItem(storageKey) !== null;
     } catch {
-      // localStorage недоступен: просто не показываем окно
+      return true;
     }
-  }, [reviewable, myReviews.isLoading, pendingCount, storageKey]);
+  })();
+
+  const dialogOpen =
+    mounted &&
+    reviewable &&
+    !myReviews.isLoading &&
+    pendingCount > 0 &&
+    !hasSeenPrompt &&
+    dismissedKey !== storageKey;
 
   const closeDialog = () => {
-    setDialogOpen(false);
+    setDismissedKey(storageKey);
+
     try {
       localStorage.setItem(storageKey, "1");
     } catch {
@@ -89,12 +116,18 @@ export function OrderReviewPrompt({ order }: { order: Schema<"OrderOut"> }) {
       >
         <div className="flex items-start gap-4">
           <div className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-sand text-brand-accent">
-            {allDone ? <CheckCircle2 className="size-5" /> : <MessageSquare className="size-5" />}
+            {allDone ? (
+              <CheckCircle2 className="size-5" />
+            ) : (
+              <MessageSquare className="size-5" />
+            )}
           </div>
+
           <div className="flex-1">
             <h2 className="font-accent text-xl font-medium text-brand-ink">
               {allDone ? "Спасибо за отзывы!" : "Расскажите о покупке"}
             </h2>
+
             <p className="mt-1 text-sm leading-relaxed text-brand-muted">
               {allDone
                 ? "Ваши отзывы помогают другим покупателям. Если с заказом что-то не так, мы на связи."
@@ -104,26 +137,41 @@ export function OrderReviewPrompt({ order }: { order: Schema<"OrderOut"> }) {
             <ul className="mt-4 divide-y divide-brand-line">
               {products.map((p) => {
                 const done = reviewedIds.has(p.product_id);
+
                 return (
                   <li key={p.product_id} className="py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-brand-ink">{p.name}</span>
+                      <span className="text-sm font-medium text-brand-ink">
+                        {p.name}
+                      </span>
+
                       {done ? (
                         <span className="flex items-center gap-1.5 text-sm text-status-paid-fg">
-                          <CheckCircle2 className="size-4" /> Отзыв отправлен
+                          <CheckCircle2 className="size-4" />
+                          Отзыв отправлен
                         </span>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setFormFor(formFor === p.product_id ? null : p.product_id)}
+                          onClick={() =>
+                            setFormFor(
+                              formFor === p.product_id ? null : p.product_id,
+                            )
+                          }
                           className={btnOutline}
                         >
-                          {formFor === p.product_id ? "Свернуть" : "Оставить отзыв"}
+                          {formFor === p.product_id
+                            ? "Свернуть"
+                            : "Оставить отзыв"}
                         </button>
                       )}
                     </div>
+
                     {formFor === p.product_id && !done ? (
-                      <ReviewForm productId={p.product_id} onDone={() => setFormFor(null)} />
+                      <ReviewForm
+                        productId={p.product_id}
+                        onDone={() => setFormFor(null)}
+                      />
                     ) : null}
                   </li>
                 );
@@ -137,24 +185,40 @@ export function OrderReviewPrompt({ order }: { order: Schema<"OrderOut"> }) {
         </div>
       </section>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Как вам заказ № {order.id}?</DialogTitle>
             <DialogDescription>
-              Оставьте отзыв о товарах или напишите в поддержку, если что-то пошло не так.
+              Оставьте отзыв о товарах или напишите в поддержку, если что-то
+              пошло не так.
             </DialogDescription>
           </DialogHeader>
+
           <DialogFooter>
-            <button type="button" onClick={closeDialog} className={btnOutline}>
+            <button
+              type="button"
+              onClick={closeDialog}
+              className={btnOutline}
+            >
               Позже
             </button>
+
             <SupportLink className={btnOutline} />
+
             <button
               type="button"
               onClick={() => {
                 closeDialog();
-                document.getElementById("order-review")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                document
+                  .getElementById("order-review")
+                  ?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
               }}
               className={btnPrimary}
             >

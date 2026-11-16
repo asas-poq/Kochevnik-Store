@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 
 // Срабатывает один раз, когда элемент попал в зону видимости экрана.
@@ -8,11 +9,17 @@ export function useInView<T extends Element>(rootMargin = "200px") {
 
   useEffect(() => {
     const el = ref.current;
+
     if (!el || inView) return;
+
     if (typeof IntersectionObserver === "undefined") {
-      setInView(true);
-      return;
+      const frame = requestAnimationFrame(() => {
+        setInView(true);
+      });
+
+      return () => cancelAnimationFrame(frame);
     }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -22,7 +29,9 @@ export function useInView<T extends Element>(rootMargin = "200px") {
       },
       { rootMargin },
     );
+
     observer.observe(el);
+
     return () => observer.disconnect();
   }, [inView, rootMargin]);
 
