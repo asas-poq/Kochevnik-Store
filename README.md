@@ -12,6 +12,9 @@
 
 **Демонстрация витрины (сайт):** [asas-poq.github.io/Kochevnik-Store](https://asas-poq.github.io/Kochevnik-Store)
 
+**Демонстрация витрины (сайт) 2:** [kochevnik-store.vercel](https://kochevnik-store.vercel.app)
+https://kochevnik-store.vercel.app
+
 ## Обо мне и проекте
 
 Я backend-разработчик, этот проект сделан как моё backend-портфолио.
