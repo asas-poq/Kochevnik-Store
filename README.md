@@ -8,7 +8,9 @@
 
 Интернет-магазин кашемира и кожи: REST API на FastAPI, витрина и админка на Next.js, оплата через СБП (ЮKassa), уведомления в Telegram, мониторинг в Prometheus и Grafana. Весь стек поднимается одной командой через Docker Compose.
 
-**Документация API без запуска проекта:** [asas-poq.github.io/Kochevnik-Store/api](https://asas-poq.github.io/Kochevnik-Store/api/)
+* **Страница проекта (описание и архитектура):** [asas-poq.github.io/Kochevnik-Store](https://asas-poq.github.io/Kochevnik-Store)
+* **Документация API без запуска проекта:** [asas-poq.github.io/Kochevnik-Store/api](https://asas-poq.github.io/Kochevnik-Store/api/)
+* **Живая витрина магазина (демо):** [kochevnik-store.vercel.app](https://kochevnik-store.vercel.app)
 
 ## Обо мне и проекте
 

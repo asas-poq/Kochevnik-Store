@@ -1,99 +1,824 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kochevnik Store: backend-проект</title>
-  <meta name="description" content="Интернет-магазин: FastAPI, PostgreSQL, Redis, Docker. Backend-портфолио.">
-  <style>
-    :root { --bg:#faf8f5; --card:#fff; --text:#1f1b16; --muted:#6b645a; --line:#e6dfd5; --accent:#7a4e2d; }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg:#16130f; --card:#1f1b16; --text:#f2ece3; --muted:#a39a8d; --line:#332d25; --accent:#d4a574; }
-    }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
-    .wrap { max-width:1040px; margin:0 auto; padding:0 20px; }
-    header { padding:72px 0 40px; }
-    h1 { font-size:clamp(2rem,5vw,3.2rem); line-height:1.1; margin:0 0 14px; font-family:Georgia, "Times New Roman", serif; font-weight:600; }
-    h2 { font-size:1.5rem; margin:56px 0 18px; font-family:Georgia, serif; }
-    p.lead { font-size:1.15rem; color:var(--muted); max-width:720px; margin:0 0 24px; }
-    .btns { display:flex; flex-wrap:wrap; gap:10px; }
-    .btn { display:inline-block; padding:10px 18px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); text-decoration:none; font-weight:500; }
-    .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
-    .chip { font-size:.85rem; padding:4px 12px; border-radius:99px; background:var(--card); border:1px solid var(--line); color:var(--muted); }
-    .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
-    .card h3 { margin:0 0 8px; font-size:1.05rem; }
-    .card p { margin:0; color:var(--muted); font-size:.95rem; }
-    .arch { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; overflow-x:auto; }
-    .arch img { width:100%; min-width:640px; display:block; }
-    .shots { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
-    figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-    figure img { width:100%; display:block; }
-    figcaption { padding:10px 14px; font-size:.9rem; color:var(--muted); }
-    footer { padding:56px 0 64px; color:var(--muted); font-size:.9rem; }
-    a { color:var(--accent); }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kochevnik Store: интернет-магазин кашемира и кожи</title>
+<meta name="description" content="Backend-портфолио: REST API на FastAPI, витрина и админка на Next.js, оплата через СБП, уведомления в Telegram, мониторинг. Запускается одной командой через Docker Compose.">
+<meta name="theme-color" content="#fdf9f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0a09" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M3 2 21 26M21 2 3 26' stroke='%23392e21' stroke-width='2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Modern+Antiqua&family=Playpen+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  // тема выбирается до отрисовки, чтобы страница не мигала
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem("kochevnik-docs-theme"); } catch (e) {}
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    if (t === "dark") document.documentElement.classList.add("dark");
+  })();
+</script>
+<style>
+/* Палитра и шрифты взяты из frontend/src/app/globals.css магазина */
+:root {
+  --brand-bg: #fdf9f4;
+  --brand-surface: #fdfbf7;
+  --brand-section: #f7f3ee;
+  --brand-sand: #f1ede8;
+  --brand-line: #e8e0d5;
+  --brand-line-strong: #d6ccb8;
+  --brand-ink: #392e21;
+  --brand-ink-2: #4d453e;
+  --brand-muted: #6b5e4f;
+  --brand-subtle: #9c8e7d;
+  --brand-faint: #b8a99a;
+  --brand-accent: #7c5730;
+  --brand-accent-dark: #5e452a;
+  --brand-beige: #cbb09d;
+  --brand-cream: #e9e3d9;
+  --brand-dark: #1a1612;
+  --brand-green: #4a7c59;
+  --header-bg: #fbf9f6;
+  --radius: 12px;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-accent: "Playpen Sans", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Modern Antiqua", Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+.dark {
+  --brand-bg: #0b0a09;
+  --brand-surface: #141211;
+  --brand-section: #181614;
+  --brand-sand: #211e1b;
+  --brand-line: #2f2b26;
+  --brand-line-strong: #433d36;
+  --brand-ink: #f4efe8;
+  --brand-ink-2: #ddd5ca;
+  --brand-muted: #b3a999;
+  --brand-subtle: #8a8073;
+  --brand-faint: #6f665a;
+  --brand-accent: #d4a977;
+  --brand-accent-dark: #e4bf91;
+  --brand-dark: #000;
+  --brand-green: #6fb184;
+  --header-bg: #0b0a09;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 88px; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--brand-bg);
+  color: var(--brand-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+img, svg { max-width: 100%; display: block; }
+a { color: var(--brand-accent); text-decoration: none; }
+a:hover { color: var(--brand-accent-dark); }
+:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; border-radius: 6px; }
+code, pre { font-family: var(--font-mono); }
+.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Шапка ---------- */
+.site-header {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--brand-line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.header-row { display: flex; align-items: center; gap: 24px; height: 72px; }
+.logo { display: flex; align-items: center; gap: 10px; color: var(--brand-ink); flex-shrink: 0; }
+.logo:hover { color: var(--brand-ink); }
+.logo svg { width: 20px; height: 24px; }
+.logo span { font-family: var(--font-logo); font-size: 15px; letter-spacing: .22em; }
+.nav { display: flex; gap: 32px; margin: 0 auto; }
+.nav a { color: var(--brand-ink); font-size: 15px; letter-spacing: .01em; transition: color .15s; }
+.nav a:hover { color: var(--brand-accent); }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--brand-ink); cursor: pointer; transition: background .15s;
+}
+.icon-btn:hover { background: var(--brand-sand); }
+.icon-btn svg { width: 20px; height: 20px; }
+.theme-sun { display: none; }
+.dark .theme-sun { display: block; }
+.dark .theme-moon { display: none; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 28px; border-radius: 999px; border: 1px solid transparent;
+  font: 500 15px/1 var(--font-sans); letter-spacing: .02em; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.btn-sm { height: 40px; padding: 0 20px; font-size: 14px; }
+.btn-primary { background: var(--brand-ink); color: var(--brand-surface); }
+.btn-primary:hover { background: var(--brand-accent); color: #fff; }
+.btn-glass { background: rgba(156,142,125,.8); color: #fff; backdrop-filter: blur(8px); }
+.btn-glass:hover { background: var(--brand-accent); color: #fff; }
+.btn-outline { border-color: var(--brand-line-strong); color: var(--brand-ink); background: transparent; }
+.btn-outline:hover { background: var(--brand-sand); color: var(--brand-ink); }
+.btn-ghost-light { border-color: rgba(233,227,217,.5); color: var(--brand-cream); }
+.btn-ghost-light:hover { background: rgba(233,227,217,.12); color: #fff; }
+.btn-beige { background: var(--brand-cream); color: var(--brand-dark); }
+.btn-beige:hover { background: #fff; color: var(--brand-dark); }
+
+.menu-toggle { display: none; }
+
+/* ---------- Баннер ---------- */
+.hero {
+  position: relative; isolation: isolate; display: flex; align-items: center;
+  min-height: 600px; overflow: hidden;
+  background: linear-gradient(135deg, #4a3b2c 0%, #1a1612 100%);
+}
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: -3;
+  background: url("data:image/jpeg;base64,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") center / cover no-repeat;
+}
+.hero::after {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background:
+    linear-gradient(90deg, rgba(26,22,18,.85) 0%, rgba(26,22,18,.6) 50%, rgba(26,22,18,0) 100%),
+    linear-gradient(0deg, rgba(26,22,18,.7) 0%, rgba(26,22,18,0) 50%);
+}
+.hero-inner { padding-top: 72px; padding-bottom: 72px; }
+.hero h1 {
+  margin: 0; max-width: 880px; font-weight: 400; font-size: clamp(34px, 5.4vw, 64px);
+  line-height: 1.1; color: var(--brand-cream);
+}
+.hero h1 .accent { display: block; font-family: var(--font-accent); color: var(--brand-beige); }
+.hero p { margin: 28px 0 0; max-width: 560px; font-size: 18px; color: var(--brand-cream); opacity: .9; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 40px; }
+
+/* ---------- Секции ---------- */
+.section { padding: 96px 0; }
+.section-alt { background: var(--brand-section); }
+.section-head { max-width: 720px; margin-bottom: 48px; }
+.section-head h2 { margin: 0; font-weight: 400; font-size: clamp(28px, 3.6vw, 44px); line-height: 1.15; letter-spacing: -.01em; }
+.section-head p { margin: 16px 0 0; color: var(--brand-muted); font-size: 17px; }
+.accent-font { font-family: var(--font-accent); font-weight: 500; }
+
+.split { display: grid; grid-template-columns: 1fr 1.15fr; gap: 64px; align-items: start; }
+
+/* Таблица «кто что делал» */
+.table-wrap { overflow-x: auto; border: 1px solid var(--brand-line); border-radius: 16px; background: var(--brand-surface); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 16px 20px; border-bottom: 1px solid var(--brand-line); }
+tr:last-child td { border-bottom: 0; }
+th { font-weight: 600; color: var(--brand-ink); background: var(--brand-sand); }
+td:first-child { font-weight: 600; color: var(--brand-ink); width: 34%; }
+td { color: var(--brand-ink-2); }
+.tag {
+  display: inline-block; padding: 2px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: var(--brand-sand); color: var(--brand-ink);
+}
+.tag-me { background: #dcebdd; color: #2d6a42; }
+.tag-ai { background: #f5e9cc; color: #8a5f12; }
+.tag-fig { background: #dbe6f4; color: #2c5688; }
+.dark .tag-me { background: #1f3a28; color: #8fd0a3; }
+.dark .tag-ai { background: #3d3217; color: #f0c869; }
+.dark .tag-fig { background: #1d3350; color: #9cc3f0; }
+
+/* Возможности */
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.panel { background: var(--brand-surface); border: 1px solid var(--brand-line); border-radius: 16px; padding: 36px; }
+.panel h3 { margin: 0 0 20px; font-family: var(--font-accent); font-weight: 500; font-size: 24px; line-height: 1.3; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.checks li { position: relative; padding-left: 28px; color: var(--brand-ink-2); }
+.checks li::before {
+  content: ""; position: absolute; left: 0; top: 7px; width: 14px; height: 8px;
+  border-left: 2px solid var(--brand-green); border-bottom: 2px solid var(--brand-green);
+  transform: rotate(-45deg) scale(.9);
+}
+
+/* Технические решения */
+.decisions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px 32px; }
+.decision { display: flex; gap: 16px; align-items: flex-start; }
+.circle {
+  flex-shrink: 0; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 999px;
+  border: 1px solid var(--brand-line); background: var(--brand-surface); color: var(--brand-accent);
+}
+.circle svg { width: 20px; height: 20px; }
+.decision h3 { margin: 0; font-family: var(--font-accent); font-weight: 500; font-size: 18px; line-height: 1.4; }
+.decision p { margin: 6px 0 0; font-size: 14.5px; line-height: 1.65; color: var(--brand-muted); }
+
+/* Скриншоты */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
+.tab {
+  height: 40px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--brand-line-strong);
+  background: transparent; color: var(--brand-ink); font: 500 14px/1 var(--font-sans); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab:hover { background: var(--brand-sand); }
+.tab[aria-selected="true"] { background: var(--brand-ink); border-color: var(--brand-ink); color: var(--brand-surface); }
+.shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.shots[hidden] { display: none; }
+.shot { margin: 0; }
+.shot button {
+  display: block; width: 100%; padding: 0; border: 1px solid var(--brand-line); border-radius: 16px; overflow: hidden;
+  background: var(--brand-sand); cursor: zoom-in; transition: border-color .15s;
+}
+.shot button:hover { border-color: var(--brand-accent); }
+.shot img { width: 100%; height: auto; }
+.shot.portrait { grid-column: auto; }
+.shot.portrait button { max-width: 420px; margin: 0 auto; }
+.shot figcaption { margin-top: 12px; font-size: 14.5px; color: var(--brand-muted); }
+.shot figcaption b { color: var(--brand-ink); font-weight: 600; }
+
+dialog.lightbox {
+  width: min(1280px, 96vw); max-height: 94vh; padding: 0; border: 0; border-radius: 16px;
+  background: var(--brand-surface); color: var(--brand-ink); overflow: hidden;
+}
+dialog.lightbox::backdrop { background: rgba(11,10,9,.82); }
+.lightbox-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 12px 12px 24px; border-bottom: 1px solid var(--brand-line); }
+.lightbox-bar strong { font-weight: 600; font-size: 15px; }
+.lightbox-body { overflow: auto; max-height: calc(94vh - 66px); }
+.lightbox-body img { width: 100%; height: auto; margin: 0 auto; }
+
+/* Архитектура */
+.arch-wrap { overflow-x: auto; border: 1px solid var(--brand-line); border-radius: 16px; background: var(--brand-surface); padding: 24px; }
+.arch-wrap svg { min-width: 760px; width: 100%; height: auto; font-family: var(--font-sans); }
+.arch-note { margin: 16px 0 0; font-size: 14.5px; color: var(--brand-muted); }
+.stack { margin-top: 32px; }
+
+/* Запуск */
+.code-block { position: relative; background: var(--brand-dark); color: var(--brand-cream); border-radius: 16px; padding: 24px 24px 24px 28px; }
+.code-block pre { margin: 0; overflow-x: auto; font-size: 14px; line-height: 1.8; }
+.code-block .c { color: var(--brand-faint); }
+.copy {
+  position: absolute; top: 14px; right: 14px; height: 34px; padding: 0 16px; border-radius: 999px;
+  border: 1px solid rgba(233,227,217,.3); background: transparent; color: var(--brand-cream);
+  font: 500 13px/1 var(--font-sans); cursor: pointer; transition: background .15s;
+}
+.copy:hover { background: rgba(233,227,217,.12); }
+.run-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; margin-top: 32px; align-items: start; }
+.small { font-size: 14.5px; color: var(--brand-muted); }
+.small code, td code { background: var(--brand-sand); padding: 2px 7px; border-radius: 6px; font-size: .88em; color: var(--brand-ink); }
+
+/* API и Figma */
+.link-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.link-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 36px;
+  border: 1px solid var(--brand-line); border-radius: 16px; background: var(--brand-surface); color: var(--brand-ink);
+}
+.link-card h3 { margin: 0; font-family: var(--font-accent); font-weight: 500; font-size: 24px; line-height: 1.3; }
+.link-card p { margin: 0 0 12px; color: var(--brand-muted); }
+.link-card:hover { color: var(--brand-ink); }
+
+.figma-band { background: var(--brand-dark); color: var(--brand-cream); padding: 88px 0; }
+.figma-inner { display: flex; align-items: center; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.figma-band h2 { margin: 0; font-weight: 400; font-size: clamp(28px, 3.6vw, 44px); line-height: 1.15; max-width: 640px; }
+.figma-band h2 .accent { display: block; font-family: var(--font-accent); color: var(--brand-beige); }
+.figma-band p { margin: 20px 0 0; max-width: 560px; color: var(--brand-cream); opacity: .85; }
+.figma-pages { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
+.figma-pages li { padding: 6px 16px; border: 1px solid rgba(233,227,217,.25); border-radius: 999px; font-size: 14px; }
+
+/* Подвал */
+.site-footer { background: var(--brand-section); padding: 64px 0 calc(32px + env(safe-area-inset-bottom, 0px)); }
+.footer-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 40px; }
+.footer-grid h4 { margin: 0 0 16px; font-family: var(--font-accent); font-weight: 500; font-size: 18px; }
+.footer-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.footer-grid a { font-size: 14.5px; color: var(--brand-ink-2); }
+.footer-grid a:hover { color: var(--brand-accent); }
+.footer-note { margin: 48px 0 0; padding-top: 24px; border-top: 1px solid var(--brand-line); font-size: 14px; color: var(--brand-subtle); }
+
+/* ---------- Адаптив ---------- */
+@media (max-width: 960px) {
+  .nav { display: none; }
+  .nav.open {
+    display: flex; flex-direction: column; gap: 4px; position: absolute; left: 0; right: 0; top: 100%;
+    margin: 0; padding: 12px 24px 20px; background: var(--header-bg); border-bottom: 1px solid var(--brand-line);
+  }
+  .nav.open a { padding: 12px 0; font-size: 16px; }
+  .header-row { gap: 12px; }
+  .header-actions { margin-left: auto; }
+  .menu-toggle { display: grid; }
+  .split, .run-grid, .cols-2, .link-cards { grid-template-columns: 1fr; }
+  .split { gap: 32px; }
+  .decisions { grid-template-columns: 1fr 1fr; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .section { padding: 72px 0; }
+}
+@media (max-width: 640px) {
+  .container { padding: 0 20px; }
+  .hero { min-height: 520px; }
+  .hero-inner { padding-top: 56px; padding-bottom: 56px; }
+  .hero p { font-size: 16px; }
+  .decisions, .shots { grid-template-columns: 1fr; }
+  .panel, .link-card { padding: 28px 24px; }
+  .btn-hide-sm { display: none; }
+  .footer-grid { grid-template-columns: 1fr; }
+  td:first-child { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+</style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Kochevnik Store</h1>
-    <p class="lead">Интернет-магазин кашемира и кожи. Я backend-разработчик, и это моё backend-портфолио: API, резервирование остатков, оплата через СБП, воркер, мониторинг. Весь стек поднимается одной командой Docker Compose.</p>
-    <div class="btns">
-      <a class="btn primary" href="api/">Документация API (Swagger)</a>
-      <a class="btn" href="https://github.com/asas-poq/Kochevnik-Store">Код на GitHub</a>
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="logo" href="#top" aria-label="Kochevnik Store: в начало страницы">
+      <svg viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 2 21 26M21 2 3 26"/></svg>
+      <span>KOCHEVNIK</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Разделы страницы">
+      <a href="#about">О проекте</a>
+      <a href="#features">Возможности</a>
+      <a href="#screens">Скриншоты</a>
+      <a href="#arch">Архитектура</a>
+      <a href="#run">Запуск</a>
+      <a href="#design">Макеты</a>
+    </nav>
+    <div class="header-actions">
+      <a class="btn btn-primary btn-sm btn-hide-sm" href="api/">Документация API</a>
+      <button class="icon-btn" id="theme" type="button" aria-label="Переключить тему">
+        <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <button class="icon-btn menu-toggle" id="menu" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
-    <div class="chips">
-      <span class="chip">Python 3.11</span><span class="chip">FastAPI</span><span class="chip">SQLAlchemy 2.0 async</span>
-      <span class="chip">PostgreSQL 16</span><span class="chip">Redis 7</span><span class="chip">ARQ</span>
-      <span class="chip">Docker Compose</span><span class="chip">nginx</span><span class="chip">Prometheus</span>
-      <span class="chip">Grafana</span><span class="chip">GitHub Actions</span>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <h1>
+        Интернет-магазин кашемира и кожи
+        <span class="accent">с полноценным backend</span>
+      </h1>
+      <p>REST API на FastAPI, витрина и админка на Next.js, оплата через СБП, уведомления в Telegram и мониторинг. Весь стек поднимается одной командой.</p>
+      <div class="hero-actions">
+        <a class="btn btn-glass" href="api/">Документация API</a>
+        <a class="btn btn-ghost-light" href="https://github.com/asas-poq/Kochevnik-Store">Код на GitHub</a>
+      </div>
     </div>
-  </header>
+  </section>
 
-  <h2>Архитектура</h2>
-  <div class="arch"><img src="architecture.svg" alt="Схема архитектуры"></div>
+  <section class="section" id="about">
+    <div class="container split">
+      <div class="section-head" style="margin-bottom:0">
+        <h2>Backend-портфолио, а не шаблон из конструктора</h2>
+        <p>Я backend-разработчик. Магазин сделан, чтобы показать API в работе: данные, заказы, оплата, фоновые задачи и наблюдаемость. Витрина нужна как демонстрация, и в таблице справа честно указано, что в проекте сделано мной, а что нет.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Часть</th><th>Кто делал</th></tr></thead>
+          <tbody>
+            <tr><td>API, модель данных, миграции, логика заказов и оплаты, воркер, парсер, тесты</td><td><span class="tag tag-me">Написано мной</span></td></tr>
+            <tr><td>Docker Compose, nginx, Prometheus, Grafana, CI</td><td><span class="tag tag-me">Настроено мной</span></td></tr>
+            <tr><td>Дизайн: пять экранов (главная, каталог, карточка товара, корзина, оформление)</td><td><span class="tag tag-fig">Нарисовано мной в Figma</span></td></tr>
+            <tr><td>Фронтенд</td><td><span class="tag tag-ai">Сгенерирован ИИ по моим макетам</span>, к API подключал я</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
-  <h2>Ключевые решения</h2>
-  <div class="grid">
-    <div class="card"><h3>Резервирование остатков</h3><p>Остаток списывается при создании заказа под блокировкой строк (<code>SELECT … FOR UPDATE</code>) в фиксированном порядке, без взаимных блокировок.</p></div>
-    <div class="card"><h3>Автоотмена заказов</h3><p>Воркер отменяет неоплаченный заказ через 30 минут и возвращает остаток на склад.</p></div>
-    <div class="card"><h3>Идемпотентные вебхуки</h3><p>События оплаты записываются в журнал, повторная доставка ничего не меняет, статус и сумма проверяются у ЮKassa.</p></div>
-    <div class="card"><h3>Машина статусов</h3><p>Допустимые переходы заказа заданы таблицей, гонки и повторы не откатывают статус.</p></div>
-    <div class="card"><h3>Безопасность</h3><p>Access и refresh токены с сессиями, лимиты запросов через Redis, чужой заказ отдаёт 404, production-режим не стартует со слабыми секретами.</p></div>
-    <div class="card"><h3>Наблюдаемость</h3><p>Метрики Prometheus, дашборд Grafana, структурированные логи, <code>/health</code> с проверкой зависимостей.</p></div>
+  <section class="section section-alt" id="features">
+    <div class="container">
+      <div class="section-head">
+        <h2>Что умеет магазин</h2>
+        <p>Две роли: покупатель, который выбирает и платит, и владелец, который управляет каталогом и заказами.</p>
+      </div>
+      <div class="cols-2">
+        <div class="panel">
+          <h3>Покупатель</h3>
+          <ul class="checks">
+            <li>Каталог с фильтрами по категории, материалу, цвету, размеру и цене</li>
+            <li>Поиск и сортировка по популярности и скидке</li>
+            <li>Карточка товара с остатками по размерам и отзывами</li>
+            <li>Избранное и корзина</li>
+            <li>Оформление и оплата через СБП</li>
+            <li>Личный кабинет с историей заказов</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Владелец</h3>
+          <ul class="checks">
+            <li>Редактор товаров с загрузкой фото</li>
+            <li>Управление заказами и пользователями</li>
+            <li>Модерация отзывов</li>
+            <li>Запуск парсера каталога и состояние сервисов</li>
+            <li>Новые заказы приходят в Telegram, статус меняется кнопками прямо в чате</li>
+            <li>Админка на SQLAdmin для работы с базой</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="decisions">
+    <div class="container">
+      <div class="section-head">
+        <h2>Технические решения</h2>
+        <p>Места, где у магазина есть реальные сложности: деньги, остатки, повторные запросы и сбои.</p>
+      </div>
+      <div class="decisions">
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+          <div>
+            <h3>Резервирование остатков</h3>
+            <p>Заказ списывает остаток сразу, под блокировкой строк размеров (<code>SELECT ... FOR UPDATE</code>). Строки блокируются в фиксированном порядке, поэтому два заказа с общими позициями не создают взаимную блокировку.</p>
+          </div>
+        </div>
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div>
+            <h3>Автоотмена заказов</h3>
+            <p>Неоплаченный заказ отменяется воркером через 30 минут, остаток возвращается на склад.</p>
+          </div>
+        </div>
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 6h7M6 8.5v3a3 3 0 0 0 3 3h6.5"/></svg></div>
+          <div>
+            <h3>Явная машина статусов</h3>
+            <p>Допустимые переходы заданы таблицей, всё остальное отклоняется. Повторные вебхуки и гонки не откатывают статус.</p>
+          </div>
+        </div>
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></div>
+          <div>
+            <h3>Идемпотентные вебхуки оплаты</h3>
+            <p>Каждое событие записывается в <code>payment_events</code>, повторная доставка возвращает <code>duplicate</code> и ничего не меняет. В боевом режиме статус и сумма запрашиваются у ЮKassa. Оплата по уже отменённому заказу уходит владельцу на ручной разбор.</p>
+          </div>
+        </div>
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <div>
+            <h3>Безопасность</h3>
+            <p>Access и refresh токены с привязкой к сессии, ограничение частоты запросов через Redis, чужой заказ возвращает 404 вместо 403. В режиме <code>production</code> сервер не стартует со слабыми секретами и тестовыми ключами.</p>
+          </div>
+        </div>
+        <div class="decision">
+          <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+          <div>
+            <h3>Наблюдаемость</h3>
+            <p>Метрики Prometheus, дашборд Grafana, структурированные логи с идентификатором запроса, <code>/health</code> с проверкой БД, Redis, S3 и Telegram.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="screens">
+    <div class="container">
+      <div class="section-head">
+        <h2>Как это выглядит</h2>
+        <p>Настоящие скриншоты запущенного проекта. Нажмите на любой, чтобы открыть крупно.</p>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Группы скриншотов">
+        <button class="tab" role="tab" id="tab-shop" aria-selected="true" aria-controls="panel-shop" type="button">Витрина</button>
+        <button class="tab" role="tab" id="tab-admin" aria-selected="false" aria-controls="panel-admin" type="button">Админка и Telegram</button>
+        <button class="tab" role="tab" id="tab-back" aria-selected="false" aria-controls="panel-back" type="button">Бэкенд и инфраструктура</button>
+      </div>
+
+      <div class="shots" id="panel-shop" role="tabpanel" aria-labelledby="tab-shop">
+        <figure class="shot"><button type="button" data-full="screenshots/01-home.png" data-title="Главная"><img loading="lazy" src="screenshots/01-home.png" alt="Главная страница магазина с акварельным баннером" width="1915" height="906"></button><figcaption><b>Главная.</b> Баннер и переход в каталог</figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/02-catalog.png" data-title="Каталог"><img loading="lazy" src="screenshots/02-catalog.png" alt="Каталог с фильтрами" width="1917" height="912"></button><figcaption><b>Каталог.</b> Фильтры, поиск и сортировка</figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/03-product.png" data-title="Карточка товара"><img loading="lazy" src="screenshots/03-product.png" alt="Карточка товара" width="1916" height="912"></button><figcaption><b>Карточка товара.</b> Цена со скидкой, цвета, размеры, отзывы</figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/04-cart.png" data-title="Корзина"><img loading="lazy" src="screenshots/04-cart.png" alt="Корзина" width="1916" height="912"></button><figcaption><b>Корзина.</b> Состав заказа и итог</figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/05-checkout.png" data-title="Оформление заказа"><img loading="lazy" src="screenshots/05-checkout.png" alt="Оформление заказа" width="1916" height="912"></button><figcaption><b>Оформление заказа.</b> Контакты и доставка</figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/06-sandbox-payment.png" data-title="Оплата в песочнице"><img loading="lazy" src="screenshots/06-sandbox-payment.png" alt="Тестовая страница оплаты" width="1916" height="916"></button><figcaption><b>Оплата в песочнице.</b> Платёж подтверждается или отклоняется</figcaption></figure>
+      </div>
+
+      <div class="shots" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+        <figure class="shot"><button type="button" data-full="screenshots/07-admin-orders.png" data-title="Заказы в админке"><img loading="lazy" src="screenshots/07-admin-orders.png" alt="Список заказов в админке" width="1911" height="905"></button><figcaption><b>Заказы в админке.</b> Статусы и фильтры</figcaption></figure>
+        <figure class="shot portrait"><button type="button" data-full="screenshots/08-telegram.png" data-title="Уведомление в Telegram"><img loading="lazy" src="screenshots/08-telegram.png" alt="Уведомление о новом заказе в Telegram" width="795" height="1007"></button><figcaption><b>Уведомление в Telegram.</b> Статус заказа меняется кнопками</figcaption></figure>
+      </div>
+
+      <div class="shots" id="panel-back" role="tabpanel" aria-labelledby="tab-back" hidden>
+        <figure class="shot"><button type="button" data-full="screenshots/09-swagger.png" data-title="Swagger"><img loading="lazy" src="screenshots/09-swagger.png" alt="Swagger UI запущенного API" width="1917" height="911"></button><figcaption><b>Swagger</b> на <code>/docs</code></figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/10-sqladmin.png" data-title="SQLAdmin"><img loading="lazy" src="screenshots/10-sqladmin.png" alt="SQLAdmin" width="1916" height="911"></button><figcaption><b>SQLAdmin</b> на <code>/sqladmin</code></figcaption></figure>
+        <figure class="shot"><button type="button" data-full="screenshots/11-docker-ps.png" data-title="Контейнеры"><img loading="lazy" src="screenshots/11-docker-ps.png" alt="Вывод docker compose ps" width="1917" height="1016"></button><figcaption><b>Контейнеры.</b> Вывод <code>docker compose ps</code></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="arch">
+    <div class="container">
+      <div class="section-head">
+        <h2>Архитектура</h2>
+        <p>Браузер работает с одним адресом. nginx направляет <code>/api</code>, <code>/media</code>, <code>/docs</code> и <code>/sqladmin</code> в FastAPI, остальные запросы во фронтенд. Поэтому при локальном запуске CORS не используется.</p>
+      </div>
+
+      <div class="arch-wrap">
+        <svg viewBox="0 0 990 540" role="img" aria-labelledby="arch-title arch-desc">
+          <title id="arch-title">Схема архитектуры Kochevnik Store</title>
+          <desc id="arch-desc">Браузер обращается к nginx. nginx передаёт запросы во фронтенд Next.js и в API на FastAPI. API работает с PostgreSQL и Redis. Воркер ARQ берёт задачи из Redis, ходит в PostgreSQL, Telegram и на сайт-источник каталога. ЮKassa присылает вебхуки в API. Prometheus собирает метрики API, Grafana читает Prometheus.</desc>
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 1 10 5 0 9z" fill="var(--brand-muted)"/>
+            </marker>
+            <style>
+              .bx { fill: var(--brand-bg); stroke: var(--brand-line-strong); stroke-width: 1.2; }
+              .bx-core { fill: var(--brand-bg); stroke: var(--brand-accent); stroke-width: 2; }
+              .bx-ext { fill: none; stroke: var(--brand-subtle); stroke-width: 1.2; stroke-dasharray: 5 4; }
+              .t1 { fill: var(--brand-ink); font-size: 15px; font-weight: 600; }
+              .t2 { fill: var(--brand-subtle); font-size: 12px; }
+              .ln { fill: none; stroke: var(--brand-muted); stroke-width: 1.3; }
+              .lb { fill: var(--brand-subtle); font-size: 11.5px; }
+            </style>
+          </defs>
+
+          <!-- Связи -->
+          <path class="ln" marker-end="url(#ah)" d="M140 245 H190"/>
+          <path class="ln" marker-end="url(#ah)" d="M310 235 H345 V105 H380"/>
+          <path class="ln" marker-end="url(#ah)" d="M310 250 H380"/>
+          <path class="ln" marker-end="url(#ah)" d="M570 240 H615 V140 H640"/>
+          <path class="ln" marker-end="url(#ah)" d="M570 268 H640"/>
+          <path class="ln" marker-end="url(#ah)" d="M570 365 H715 V297"/>
+          <path class="ln" marker-end="url(#ah)" d="M570 385 H815 V150 H792"/>
+          <path class="ln" marker-end="url(#ah)" d="M570 405 H838"/>
+          <path class="ln" marker-end="url(#ah)" d="M520 420 V445 H820 V495 H838"/>
+          <path class="ln" marker-end="url(#ah)" d="M840 85 H595 V215 H572"/>
+          <path class="ln" marker-end="url(#ah)" d="M380 495 H360 V275 H380"/>
+          <path class="ln" marker-end="url(#ah)" d="M640 495 H572"/>
+
+          <!-- Подписи связей -->
+          <text class="lb" x="350" y="97">/</text>
+          <text class="lb" x="690" y="77">вебхук оплаты</text>
+          <text class="lb" x="590" y="436">парсер</text>
+          <text class="lb" x="582" y="486">читает</text>
+          <text class="lb" x="392" y="530">метрики API</text>
+          <text class="lb" x="722" y="326">очередь</text>
+
+          <!-- Узлы -->
+          <rect class="bx" x="20" y="215" width="120" height="60" rx="12"/>
+          <text class="t1" x="80" y="241" text-anchor="middle">Браузер</text>
+          <text class="t2" x="80" y="260" text-anchor="middle">покупатель, владелец</text>
+
+          <rect class="bx" x="190" y="215" width="120" height="60" rx="12"/>
+          <text class="t1" x="250" y="241" text-anchor="middle">nginx</text>
+          <text class="t2" x="250" y="260" text-anchor="middle">порт 80</text>
+
+          <rect class="bx" x="380" y="70" width="190" height="70" rx="12"/>
+          <text class="t1" x="475" y="98" text-anchor="middle">Витрина и админка</text>
+          <text class="t2" x="475" y="118" text-anchor="middle">Next.js 16, React 19</text>
+
+          <rect class="bx-core" x="380" y="200" width="190" height="90" rx="12"/>
+          <text class="t1" x="475" y="231" text-anchor="middle">API</text>
+          <text class="t2" x="475" y="251" text-anchor="middle">FastAPI, SQLAlchemy async</text>
+          <text class="t2" x="475" y="269" text-anchor="middle">/api /media /docs /sqladmin</text>
+
+          <rect class="bx" x="380" y="350" width="190" height="70" rx="12"/>
+          <text class="t1" x="475" y="378" text-anchor="middle">Воркер ARQ</text>
+          <text class="t2" x="475" y="398" text-anchor="middle">парсер, автоотмена, Telegram</text>
+
+          <rect class="bx" x="640" y="110" width="150" height="60" rx="12"/>
+          <text class="t1" x="715" y="136" text-anchor="middle">PostgreSQL 16</text>
+          <text class="t2" x="715" y="155" text-anchor="middle">данные, миграции</text>
+
+          <rect class="bx" x="640" y="235" width="150" height="60" rx="12"/>
+          <text class="t1" x="715" y="261" text-anchor="middle">Redis 7</text>
+          <text class="t2" x="715" y="280" text-anchor="middle">кэш, лимиты, очередь</text>
+
+          <rect class="bx-ext" x="840" y="55" width="130" height="60" rx="12"/>
+          <text class="t1" x="905" y="81" text-anchor="middle">ЮKassa</text>
+          <text class="t2" x="905" y="100" text-anchor="middle">СБП</text>
+
+          <rect class="bx-ext" x="840" y="380" width="130" height="50" rx="12"/>
+          <text class="t1" x="905" y="410" text-anchor="middle">Telegram</text>
+
+          <rect class="bx-ext" x="840" y="470" width="130" height="50" rx="12"/>
+          <text class="t1" x="905" y="494" text-anchor="middle">Сайт-источник</text>
+          <text class="t2" x="905" y="510" text-anchor="middle">каталог товаров</text>
+
+          <rect class="bx" x="380" y="470" width="190" height="50" rx="12"/>
+          <text class="t1" x="475" y="500" text-anchor="middle">Prometheus</text>
+
+          <rect class="bx" x="640" y="470" width="150" height="50" rx="12"/>
+          <text class="t1" x="715" y="500" text-anchor="middle">Grafana</text>
+        </svg>
+      </div>
+      <p class="arch-note">Пунктирная рамка означает внешний сервис. Контейнер <code>migrate</code> применяет миграции Alembic перед стартом API.</p>
+
+      <div class="table-wrap stack">
+        <table>
+          <thead><tr><th>Слой</th><th>Технологии</th></tr></thead>
+          <tbody>
+            <tr><td>API</td><td>Python 3.11, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2, Alembic</td></tr>
+            <tr><td>Хранилища</td><td>PostgreSQL 16, Redis 7</td></tr>
+            <tr><td>Фоновые задачи</td><td>ARQ: парсер, автоотмена заказов, Telegram</td></tr>
+            <tr><td>Админ-панель</td><td>SQLAdmin и собственная админка во фронтенде</td></tr>
+            <tr><td>Витрина</td><td>Next.js 16, React 19, TypeScript, Tailwind 4, shadcn/ui, TanStack Query, zustand</td></tr>
+            <tr><td>Инфраструктура</td><td>Docker Compose, nginx, Prometheus, Grafana, GitHub Actions</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="run">
+    <div class="container">
+      <div class="section-head">
+        <h2>Запуск</h2>
+        <p>Нужен Docker с Compose 2.23 или новее. Миграции применяются автоматически перед стартом API.</p>
+      </div>
+
+      <div class="code-block">
+        <button class="copy" id="copy" type="button">Копировать</button>
+<pre id="cmd"><code>git clone https://github.com/asas-poq/Kochevnik-Store.git
+cd Kochevnik-Store
+
+cp backend/.env.example backend/.env
+docker compose up -d --build
+make seed</code></pre>
+      </div>
+      <p class="small" style="margin-top:16px">Команда <code>make seed</code> создаёт двух пользователей, запускает парсер и загружает в каталог 50 товаров. Это занимает несколько минут, потому что парсер делает паузы между запросами.</p>
+
+      <div class="run-grid">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Сервис</th><th>Адрес</th></tr></thead>
+            <tbody>
+              <tr><td>Магазин</td><td><code>http://localhost</code></td></tr>
+              <tr><td>Админка магазина</td><td><code>http://localhost/admin</code></td></tr>
+              <tr><td>Swagger</td><td><code>http://localhost/docs</code></td></tr>
+              <tr><td>SQLAdmin</td><td><code>http://localhost/sqladmin</code></td></tr>
+              <tr><td>Grafana</td><td><code>http://localhost:3001</code></td></tr>
+              <tr><td>Prometheus</td><td><code>http://localhost:9090</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Роль</th><th>Почта и пароль</th></tr></thead>
+            <tbody>
+              <tr><td>Администратор</td><td><code>admin@example.com</code><br><code>Admin123!</code></td></tr>
+              <tr><td>Покупатель</td><td><code>anna@example.com</code><br><code>Customer123!</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="small" style="margin-top:16px">Оплата работает в песочнице: после оформления заказа открывается тестовая страница, на которой платёж подтверждается или отклоняется. Без токена Telegram-бота уведомления пишутся в лог воркера.</p>
+    </div>
+  </section>
+
+  <section class="section" id="docs">
+    <div class="container">
+      <div class="section-head">
+        <h2>Посмотреть без запуска</h2>
+        <p>Документация API доступна онлайн как статическая копия Swagger: можно изучить все ручки, схемы и ответы, не поднимая проект.</p>
+      </div>
+      <div class="link-cards">
+        <a class="link-card" href="api/">
+          <h3>Документация API</h3>
+          <p>Интерактивный Swagger со всеми ручками, схемами запросов и форматом ошибок <code>{detail, code}</code>. Запросы отсюда не отправляются, это только справочник.</p>
+          <span class="btn btn-primary">Открыть Swagger</span>
+        </a>
+        <a class="link-card" href="https://github.com/asas-poq/Kochevnik-Store">
+          <h3>Исходный код</h3>
+          <p>Репозиторий на GitHub: backend, фронтенд, миграции, тесты, Docker Compose и настройки CI.</p>
+          <span class="btn btn-outline">Открыть GitHub</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="figma-band" id="design">
+    <div class="container figma-inner">
+      <div>
+        <h2>Дизайн витрины нарисован в Figma<span class="accent">макеты пяти экранов</span></h2>
+        <p>Фронтенд сгенерирован с помощью ИИ по этим макетам. Палитра, шрифты и скругления на этой странице взяты из них же.</p>
+        <ul class="figma-pages">
+          <li>Главная</li><li>Каталог</li><li>Карточка товара</li><li>Корзина</li><li>Оформление</li>
+        </ul>
+      </div>
+      <a class="btn btn-beige" href="https://www.figma.com/design/SdLZRSgUdizjPyxh0Rj6v7/Untitled?node-id=0-1" target="_blank" rel="noopener">Открыть макеты в Figma</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="#top" aria-label="В начало страницы">
+          <svg viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 2 21 26M21 2 3 26"/></svg>
+          <span>KOCHEVNIK</span>
+        </a>
+        <p class="small" style="margin:16px 0 0;max-width:280px">Интернет-магазин изделий из монгольского кашемира и кожи. Проект сделан как backend-портфолио.</p>
+      </div>
+      <div>
+        <h4>Проект</h4>
+        <ul>
+          <li><a href="https://github.com/asas-poq/Kochevnik-Store">Код на GitHub</a></li>
+          <li><a href="https://github.com/asas-poq/Kochevnik-Store#readme">README</a></li>
+          <li><a href="https://github.com/asas-poq/Kochevnik-Store/actions/workflows/ci.yml">CI</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Документация</h4>
+        <ul>
+          <li><a href="api/">Документация API</a></li>
+          <li><a href="api/openapi.json">openapi.json</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Дизайн</h4>
+        <ul>
+          <li><a href="https://www.figma.com/design/SdLZRSgUdizjPyxh0Rj6v7/Untitled?node-id=0-1" target="_blank" rel="noopener">Макеты в Figma</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer-note">Фронтенд сгенерирован с помощью ИИ по моим макетам Figma, всё остальное написано мной. Лицензия MIT.</p>
   </div>
+</footer>
 
-  <h2>Как это выглядит</h2>
-  <div class="shots">
-    <figure><img src="screenshots/01-home.png" alt="" onerror="this.parentElement.remove()"><figcaption>Главная</figcaption></figure>
-    <figure><img src="screenshots/02-catalog.png" alt="" onerror="this.parentElement.remove()"><figcaption>Каталог</figcaption></figure>
-    <figure><img src="screenshots/02-catalog.png" alt="" onerror="this.parentElement.remove()"><figcaption>Карточка товара</figcaption></figure>
-    <figure><img src="screenshots/04-cart.png" alt="" onerror="this.parentElement.remove()"><figcaption>Корзина</figcaption></figure>
-    <figure><img src="screenshots/05-checkout.png" alt="" onerror="this.parentElement.remove()"><figcaption>Оформление заказа</figcaption></figure>
-    <figure><img src="screenshots/07-admin-orders.png" alt="" onerror="this.parentElement.remove()"><figcaption>Заказы в админке</figcaption></figure>
-    <figure><img src="screenshots/08-telegram.png" alt="" onerror="this.parentElement.remove()"><figcaption>Уведомления в Telegram</figcaption></figure>
+<dialog class="lightbox" id="lightbox" aria-labelledby="lb-title">
+  <div class="lightbox-bar">
+    <strong id="lb-title"></strong>
+    <button class="icon-btn" id="lb-close" type="button" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
   </div>
+  <div class="lightbox-body"><img id="lb-img" alt=""></div>
+</dialog>
 
-  <h2>Бэкенд и инфраструктура</h2>
-  <div class="shots">
-    <figure><img src="screenshots/09-swagger.png" alt="" onerror="this.parentElement.remove()"><figcaption>Swagger, <code>/docs</code></figcaption></figure>
-    <figure><img src="screenshots/10-sqladmin.png" alt="" onerror="this.parentElement.remove()"><figcaption>SQLAdmin</figcaption></figure>
-    <figure><img src="screenshots/11-docker-ps.png" alt="" onerror="this.parentElement.remove()"><figcaption>Контейнеры</figcaption></figure>
-    <figure><img src="screenshots/12-grafana.png" alt="" onerror="this.parentElement.remove()"><figcaption>Grafana</figcaption></figure>
-    <figure><img src="screenshots/13-pytest.png" alt="" onerror="this.parentElement.remove()"><figcaption>Тесты и линтер</figcaption></figure>
-  </div>
-
-  <footer>Фронтенд сгенерирован с помощью ИИ по моим макетам Figma, всё остальное написано мной. <a href="https://github.com/asas-poq/Kochevnik-Store">Исходный код</a>.</footer>
-</div>
 <script>
-  window.addEventListener("load", function () {
-    document.querySelectorAll(".shots").forEach(function (g) {
-      if (!g.querySelector("figure")) { g.previousElementSibling.remove(); g.remove(); }
+(function () {
+  var root = document.documentElement;
+
+  // Тема
+  document.getElementById("theme").addEventListener("click", function () {
+    var dark = root.classList.toggle("dark");
+    try { localStorage.setItem("kochevnik-docs-theme", dark ? "dark" : "light"); } catch (e) {}
+  });
+
+  // Мобильное меню
+  var nav = document.getElementById("nav");
+  var menu = document.getElementById("menu");
+  function setMenu(open) {
+    nav.classList.toggle("open", open);
+    menu.setAttribute("aria-expanded", String(open));
+  }
+  menu.addEventListener("click", function () { setMenu(!nav.classList.contains("open")); });
+  nav.addEventListener("click", function (e) { if (e.target.tagName === "A") setMenu(false); });
+
+  // Вкладки скриншотов
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.tabIndex = i === 0 ? 0 : -1;
+    t.addEventListener("click", function () { select(t); });
+    t.addEventListener("keydown", function (e) {
+      var d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!d) return;
+      var n = tabs[(i + d + tabs.length) % tabs.length];
+      select(n); n.focus();
     });
   });
+
+  // Просмотр скриншота
+  var box = document.getElementById("lightbox");
+  var img = document.getElementById("lb-img");
+  var title = document.getElementById("lb-title");
+  document.querySelectorAll(".shot button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      img.src = b.dataset.full;
+      img.alt = b.querySelector("img").alt;
+      title.textContent = b.dataset.title;
+      if (box.showModal) box.showModal(); else window.open(b.dataset.full, "_blank");
+    });
+  });
+  document.getElementById("lb-close").addEventListener("click", function () { box.close(); });
+  box.addEventListener("click", function (e) { if (e.target === box) box.close(); });
+  box.addEventListener("close", function () { img.removeAttribute("src"); });
+
+  // Копирование команд
+  var copy = document.getElementById("copy");
+  copy.addEventListener("click", function () {
+    var text = document.getElementById("cmd").innerText;
+    function done() { copy.textContent = "Скопировано"; setTimeout(function () { copy.textContent = "Копировать"; }, 1800); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    }
+  });
+})();
 </script>
 </body>
 </html>
