@@ -15,7 +15,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Запросов в секунду",
+      "title": "Requests per second",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -44,11 +44,12 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Incoming API requests per second, averaged over the last minute (health and metrics endpoints excluded)."
     },
     {
       "id": 2,
-      "title": "Доля ответов 5xx",
+      "title": "5xx error rate",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -63,7 +64,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_requests_total{status=~\"5..\",route!~\"/metrics|/health\"}[5m])) / clamp_min(sum(rate(http_requests_total{route!~\"/metrics|/health\"}[5m])), 1e-9)",
+          "expr": "(sum(rate(http_requests_total{status=~\"5..\",route!~\"/metrics|/health\"}[5m])) / clamp_min(sum(rate(http_requests_total{route!~\"/metrics|/health\"}[5m])), 1e-9)) or vector(0)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -77,11 +78,12 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Share of requests that ended with a server error (HTTP 5xx) over the last 5 minutes. 0% means no errors."
     },
     {
       "id": 3,
-      "title": "Время ответа p95",
+      "title": "Response time p95",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -110,11 +112,12 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "95% of requests are answered faster than this value."
     },
     {
       "id": 4,
-      "title": "Процессов API отдаёт метрики",
+      "title": "API instances up",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -142,11 +145,11 @@
         "overrides": []
       },
       "options": {},
-      "description": "1 значит Prometheus достучался до API. 0 значит API недоступен."
+      "description": "Number of API instances Prometheus can scrape. 0 means the API is down."
     },
     {
       "id": 5,
-      "title": "Запросы по кодам ответа",
+      "title": "Requests by status code",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -175,11 +178,12 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Request rate split by HTTP status: 200 OK, 201 Created, 204 No Content, 401 Unauthorized, etc."
     },
     {
       "id": 6,
-      "title": "Время ответа p50 и p95",
+      "title": "Response time p50 and p95",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -217,11 +221,12 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "p50 is the typical request (median); p95 shows the slowest 5% of requests."
     },
     {
       "id": 7,
-      "title": "Самые нагруженные маршруты",
+      "title": "Busiest routes",
       "type": "bargauge",
       "datasource": {
         "type": "prometheus",
@@ -241,7 +246,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -250,11 +257,23 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Top 10 API routes by request rate over the last 5 minutes."
     },
     {
       "id": 8,
-      "title": "Самые медленные маршруты, p95",
+      "title": "Slowest routes, p95",
       "type": "bargauge",
       "datasource": {
         "type": "prometheus",
@@ -274,7 +293,9 @@
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
-          }
+          },
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -283,7 +304,19 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Top 10 API routes by 95th percentile response time over the last 5 minutes."
     }
   ]
 }

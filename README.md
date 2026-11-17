@@ -48,9 +48,10 @@
 |---|---|
 | ![Swagger](docs/screenshots/09-swagger.png) | ![SQLAdmin](docs/screenshots/10-sqladmin.png) |
 
-| Контейнеры (`docker compose ps`) |
-|---|
-| ![Контейнеры](docs/screenshots/11-docker-ps.png) |
+
+| Контейнеры (`docker compose ps`) | Мониторинг: Grafana (`:3001`) |
+|---|---|
+| ![Контейнеры](docs/screenshots/11-docker-ps.png) | ![Дашборд Grafana](docs/screenshots/12-grafana.png) |
 ## Возможности
 
 Покупатель: каталог с фильтрами по категории, материалу, цвету, размеру и цене, поиск, сортировка по популярности и скидке, карточка товара с остатками по размерам, отзывы, избранное, корзина, оформление и оплата через СБП, личный кабинет с историей заказов.
