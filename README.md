@@ -10,6 +10,8 @@
 
 **Документация API без запуска проекта:** [asas-poq.github.io/Kochevnik-Store/api](https://asas-poq.github.io/Kochevnik-Store/api/)
 
+**Демонстрация витрины (сайт):** [asas-poq.github.io/Kochevnik-Store](https://asas-poq.github.io/Kochevnik-Store)
+
 ## Обо мне и проекте
 
 Я backend-разработчик, этот проект сделан как моё backend-портфолио.
